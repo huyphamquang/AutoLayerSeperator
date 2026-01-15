@@ -1,0 +1,80 @@
+<!doctype html>
+<!--
+/*************************************************************************
+* ADOBE CONFIDENTIAL
+* ___________________
+*
+* Copyright 2014 Adobe Inc.
+* All Rights Reserved.
+*
+* NOTICE: Adobe permits you to use, modify, and distribute this file in
+* accordance with the terms of the Adobe license agreement accompanying
+* it. If you have received this file from a source other than Adobe,
+* then your use, modification, or distribution of it requires the prior
+* written permission of Adobe. 
+**************************************************************************/
+-->
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>UI</title>
+  <link rel="stylesheet" type="text/css" href="css/app.css">
+  <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+</head>
+
+<body>
+  <div class="container-fluid">
+    <div class="control-group m-1">
+      <label class="control-label" for="txtFileConfig">File cấu hình:</label>
+      <input type="file" class="form-control-file" id="txtExcel">
+    </div>
+    <div class="d-flex flex-row align-content-stretch">
+      <div style="flex-basis: 50%">
+        <div class="control-group m-1">
+          <label class="control-label>">Kiểu xuất file:</label for="cbSaveAs">
+          <select class="form-control form-control-sm" id="cbSaveAs">
+            <option>JPG</option>
+            <option>PSD</option>
+            <option>PNG</option>
+            <option>TIFF</option>
+          </select>
+        </div>
+      </div>
+      <div style="flex-basis: 50%">
+        <div class="control-group m-1">
+          <label class="control-label>">Phương án:</label for="cbPA">
+          <select class="form-control form-control-sm" id="cbPA">
+            <option>Tất cả</option>
+            <option>1</option>
+            <option>2</option>
+            <option>3</option>
+            <option>4</option>
+            <option>5</option>
+            <option>6</option>
+            <option>7</option>
+            <option>8</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="m-1">
+    <button class="btn btn-sm btn-secondary btn-block" id="btnTry" type="button">Tạo thử</button>
+    <button class="btn btn-sm btn-warning btn-block" id="btnPopulate" type="button">Tạo thuyết minh</button>
+    <div class="alert alert-danger toast" role="alert" style="display: none;">
+      This is a danger alert—check it out!
+    </div>
+  </div>
+</body>
+<script src="js/jquery-3.2.1.slim.min.js"></script>
+<script src="js/popper.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script src="js/xlsx.extendscript.js"></script>
+<script src="js/CSInterface.js"></script>
+<script src="js/main.js?v14"></script>
+
+</html>
