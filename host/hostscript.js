@@ -439,7 +439,7 @@ function printDebug(message) {
             writeToLogFile(message);
         }
         
-        //alert("DEBUG: " + message);l
+        //alert("DEBUG: " + message);
 
     } catch (err) {
         // Fallback to alert if CSXSEvent fails
