@@ -14,7 +14,7 @@
 * written permission of Adobe. 
 **************************************************************************/
 -->
-<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ExtensionBundleId="com.pqh.autolayerseperator" ExtensionBundleName="AutoLayerSeperator" ExtensionBundleVersion="1.0.0" Version="6.0">
+<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ExtensionBundleId="com.pqh.autolayerseperator" ExtensionBundleName="AutoLayerSeperator" ExtensionBundleVersion="1.0.0" Version="6.0" allowExternalProcess="true">
 	<ExtensionList>
 		<Extension Id="com.pqh.autolayerseperator.extension" Version="1.0"/>
 	</ExtensionList>
@@ -29,6 +29,9 @@
 		<RequiredRuntimeList>
 			<RequiredRuntime Name="CSXS" Version="10.0"/>
 		</RequiredRuntimeList>
+		<CEFCommandLine>
+			<Parameter>--enable-nodejs</Parameter>
+		</CEFCommandLine>
 	</ExecutionEnvironment>
 	<DispatchInfoList>
 		<Extension Id="com.pqh.autolayerseperator.extension">
