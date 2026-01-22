@@ -1,7 +1,0 @@
-D:\Projects\AutoLayerSeperator\CorePlugin\bin\Release\CorePlugin.exe.config
-D:\Projects\AutoLayerSeperator\CorePlugin\bin\Release\CorePlugin.exe
-D:\Projects\AutoLayerSeperator\CorePlugin\bin\Release\CorePlugin.pdb
-D:\Projects\AutoLayerSeperator\CorePlugin\obj\Release\CorePlugin.csproj.AssemblyReference.cache
-D:\Projects\AutoLayerSeperator\CorePlugin\obj\Release\CorePlugin.csproj.CoreCompileInputs.cache
-D:\Projects\AutoLayerSeperator\CorePlugin\obj\Release\CorePlugin.exe
-D:\Projects\AutoLayerSeperator\CorePlugin\obj\Release\CorePlugin.pdb

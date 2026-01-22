@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
-    <StartArguments>"D:\Desktop\LayerSeperateTool\file export size lon\FileGoc"</StartArguments>
+    <StartArguments>-c "G:\Desktop\cau_hinh_Javitex_ok_1.xlsm"</StartArguments>
   </PropertyGroup>
 </Project>

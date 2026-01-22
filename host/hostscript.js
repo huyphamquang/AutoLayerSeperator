@@ -1376,24 +1376,25 @@ function setFillLayerColor(r, g, b) {
 }
 
 
-// Hàm chạy CorePlugin.exe để tìm vị trí các điểm ảnh
-function runCorePlugin(folderPath) {
+// Common function to find and run CorePlugin.exe
+// Returns an object with: { success: boolean, error: string, corePluginPath: string }
+// Parameters:
+//   - args: Array of arguments to pass to CorePlugin.exe (e.g., ["-c", "path/to/file.xlsx"] or ["folder/path"])
+//   - workingDir: Optional working directory for batch file (defaults to first argument if it's a folder path)
+function executeCorePlugin(args, workingDir) {
     try {
-        printDebug("=== runCorePlugin START ===");
+        printDebug("=== executeCorePlugin START ===");
         printDebug("Step 1: Preparing to run CorePlugin.exe...");
-        printDebug("Step 1.1: Folder path: " + folderPath);
+        printDebug("Step 1.1: Arguments: " + JSON.stringify(args));
         
-        // Tìm CorePlugin.exe chỉ trong thư mục plugin
-        // Tìm thư mục plugin bằng cách tìm trong các thư mục CEP extensions phổ biến
+        // Find CorePlugin.exe in plugin directory
         var pluginFolder = null;
         var pluginName = "AutoLayerSeperator";
         
         printDebug("Step 1.2: Searching for plugin directory...");
         
-        // Danh sách các thư mục CEP extensions có thể chứa plugin
         var cepBasePaths = [];
         
-        // Thử lấy từ Folder.userData (thường là %APPDATA%)
         try {
             var userDataPath = Folder.userData.fsName + "\\Adobe\\CEP\\extensions";
             cepBasePaths.push(userDataPath);
@@ -1402,7 +1403,6 @@ function runCorePlugin(folderPath) {
             printDebug("WARNING Step 1.2.1: Could not get userData path: " + e.toString());
         }
         
-        // Thử lấy từ Folder.commonFiles (thường là Program Files\Common Files)
         try {
             var commonFilesPath = Folder.commonFiles.fsName + "\\Adobe\\CEP\\extensions";
             cepBasePaths.push(commonFilesPath);
@@ -1411,11 +1411,9 @@ function runCorePlugin(folderPath) {
             printDebug("WARNING Step 1.2.2: Could not get commonFiles path: " + e.toString());
         }
         
-        // Thêm các đường dẫn phổ biến khác
         cepBasePaths.push("C:\\Program Files (x86)\\Common Files\\Adobe\\CEP\\extensions");
         cepBasePaths.push("C:\\Program Files\\Common Files\\Adobe\\CEP\\extensions");
         
-        // Tìm plugin trong các thư mục CEP extensions
         for (var i = 0; i < cepBasePaths.length; i++) {
             var testPath = cepBasePaths[i] + "\\" + pluginName;
             var manifestPath = testPath + "\\CSXS\\manifest.xml";
@@ -1430,12 +1428,11 @@ function runCorePlugin(folderPath) {
             }
         }
         
-        // Nếu vẫn không tìm thấy, thử tìm từ script file location
         if (!pluginFolder) {
             printDebug("Step 1.2.7: Not found in CEP extensions, trying script file location...");
             var scriptFile = new File($.fileName);
-            var hostFolder = scriptFile.parent; // Thư mục host/
-            var testFolder = hostFolder.parent; // Thư mục plugin (parent của host/)
+            var hostFolder = scriptFile.parent;
+            var testFolder = hostFolder.parent;
             var manifestPath = testFolder.fsName + "\\CSXS\\manifest.xml";
             var manifestFile = new File(manifestPath);
             
@@ -1447,13 +1444,16 @@ function runCorePlugin(folderPath) {
         
         if (!pluginFolder) {
             printDebug("ERROR Step 1.2: Could not determine plugin directory");
-            var errorMsg = "Không thể xác định thư mục plugin.\n\nĐã tìm trong:\n";
+            var errorMsg = "Could not determine plugin directory.\n\nSearched in:\n";
             for (var i = 0; i < cepBasePaths.length; i++) {
                 errorMsg += "- " + cepBasePaths[i] + "\\" + pluginName + "\n";
             }
-            errorMsg += "\nVui lòng kiểm tra cài đặt plugin.";
-            alert(errorMsg);
-            return false;
+            errorMsg += "\nPlease check plugin installation.";
+            return {
+                success: false,
+                error: errorMsg,
+                corePluginPath: null
+            };
         }
         
         var corePluginPath = pluginFolder.fsName + "\\CorePlugin.exe";
@@ -1464,12 +1464,129 @@ function runCorePlugin(folderPath) {
         
         if (!corePluginFile.exists) {
             printDebug("ERROR Step 1.2: CorePlugin.exe not found at: " + corePluginPath);
-            alert("CorePlugin.exe file not found.\n\nSearched path:\n" + corePluginPath + "\n\nPlease place CorePlugin.exe in the plugin folder.");
-            return false;
+            var errorMsg = "CorePlugin.exe file not found.\n\nSearched path:\n" + corePluginPath + "\n\nPlease place CorePlugin.exe in the plugin folder.";
+            return {
+                success: false,
+                error: errorMsg,
+                corePluginPath: corePluginPath
+            };
         }
         printDebug("Step 1.2: CorePlugin.exe found - OK");
         
-        // Xóa file output.json nếu tồn tại
+        // Determine working directory for batch file
+        var batchWorkingDir = workingDir;
+        if (!batchWorkingDir && args.length > 0) {
+            // Try to use first argument as working directory if it's a folder path
+            var firstArg = args[0];
+            var testFolder = new Folder(firstArg);
+            if (testFolder.exists) {
+                batchWorkingDir = firstArg;
+            } else {
+                // If first arg is a file, use its parent folder
+                var testFile = new File(firstArg);
+                if (testFile.exists) {
+                    batchWorkingDir = testFile.parent.fsName;
+                }
+            }
+        }
+        
+        // Default to temp folder if still no working directory
+        if (!batchWorkingDir) {
+            batchWorkingDir = Folder.temp.fsName;
+        }
+        
+        printDebug("Step 1.3: Working directory: " + batchWorkingDir);
+        
+        // Create temporary batch file
+        var tempBatchPath = batchWorkingDir + "\\executeCorePlugin_temp_" + new Date().getTime() + ".bat";
+        var tempBatchFile = new File(tempBatchPath);
+        
+        printDebug("Step 2: Creating temporary batch file: " + tempBatchPath);
+        try {
+            tempBatchFile.open("w");
+            tempBatchFile.write("@echo off\n");
+            tempBatchFile.write("cd /d \"" + batchWorkingDir + "\"\n");
+            
+            // Build command line with quoted arguments
+            var commandLine = "\"" + corePluginPath + "\"";
+            for (var i = 0; i < args.length; i++) {
+                commandLine += " \"" + args[i] + "\"";
+            }
+            tempBatchFile.write(commandLine + "\n");
+            tempBatchFile.close();
+            printDebug("Step 2: Batch file created successfully");
+            printDebug("Step 2.1: Command: " + commandLine);
+        } catch (e) {
+            printDebug("ERROR Step 2: Failed to create batch file: " + e.toString());
+            return {
+                success: false,
+                error: "Could not create temporary batch file in folder: " + batchWorkingDir + "\n\nError: " + e.toString(),
+                corePluginPath: corePluginPath
+            };
+        }
+        
+        // Execute batch file
+        printDebug("Step 3: Executing batch file...");
+        try {
+            tempBatchFile.execute();
+            printDebug("Step 3: Batch file executed successfully");
+        } catch (e) {
+            printDebug("ERROR Step 3: Failed to execute batch file: " + e.toString());
+            // Clean up batch file
+            try {
+                if (tempBatchFile.exists) {
+                    tempBatchFile.remove();
+                }
+            } catch (removeErr) {
+                // Ignore
+            }
+            return {
+                success: false,
+                error: "Failed to execute batch file: " + e.toString(),
+                corePluginPath: corePluginPath
+            };
+        }
+        
+        // Clean up batch file after a short delay
+        printDebug("Step 4: Scheduling batch file cleanup...");
+        try {
+            // Wait a bit then remove batch file
+            $.sleep(2000); // Wait 2 seconds
+            if (tempBatchFile.exists) {
+                tempBatchFile.remove();
+                printDebug("Step 4: Temporary batch file removed successfully");
+            }
+        } catch (cleanupErr) {
+            printDebug("WARNING Step 4: Could not remove temporary batch file: " + cleanupErr.toString());
+        }
+        
+        printDebug("=== executeCorePlugin COMPLETED ===");
+        return {
+            success: true,
+            error: null,
+            corePluginPath: corePluginPath
+        };
+        
+    } catch (err) {
+        printDebug("=== executeCorePlugin ERROR ===");
+        printDebug("ERROR: " + err.toString());
+        printDebug("Error message: " + (err.message || "N/A"));
+        return {
+            success: false,
+            error: "Error running CorePlugin.exe: " + err.toString(),
+            corePluginPath: null
+        };
+    }
+}
+
+// Hàm chạy CorePlugin.exe để tìm vị trí các điểm ảnh
+function runCorePlugin(folderPath) {
+    try {
+        printDebug("=== runCorePlugin START ===");
+        printDebug("Step 1: Preparing to run CorePlugin.exe...");
+        printDebug("Step 1.1: Folder path: " + folderPath);
+        
+        // Delete output.json if it exists
         var outputJsonPath = folderPath + "\\output.json";
         var outputJsonFile = new File(outputJsonPath);
         printDebug("Step 2: Checking for existing output.json...");
@@ -1481,74 +1598,34 @@ function runCorePlugin(folderPath) {
             printDebug("Step 2.1: output.json does not exist - OK");
         }
         
-        // Chạy CorePlugin.exe với đường dẫn thư mục
-        // Vì file.execute() không hỗ trợ tham số, tạo batch file tạm thời
+        // Run CorePlugin.exe using common function
         printDebug("Step 3: Running CorePlugin.exe...");
-        printDebug("Step 3.1: CorePlugin.exe path: " + corePluginPath);
-        printDebug("Step 3.2: Folder path parameter: " + folderPath);
+        var result = executeCorePlugin([folderPath], folderPath);
         
-        // Tạo batch file tạm thời trong folderPath (có quyền ghi) để chạy CorePlugin.exe với tham số
-        var tempBatchPath = folderPath + "\\runCorePlugin_temp.bat";
-        var tempBatchFile = new File(tempBatchPath);
-        
-        printDebug("Step 3.3: Creating temporary batch file in folderPath: " + tempBatchPath);
-        try {
-            tempBatchFile.open("w");
-            tempBatchFile.write("@echo off\n");
-            tempBatchFile.write("\"" + corePluginPath + "\" \"" + folderPath + "\"\n");
-            tempBatchFile.close();
-            printDebug("Step 3.3: Batch file created successfully");
-        } catch (e) {
-            printDebug("ERROR Step 3.3: Failed to create batch file: " + e.toString());
-            alert("Không thể tạo batch file tạm thời trong thư mục: " + folderPath + "\n\nLỗi: " + e.toString());
+        if (!result.success) {
+            printDebug("ERROR Step 3: Failed to run CorePlugin.exe");
+            alert(result.error);
             return false;
         }
         
-        // Chạy batch file
-        printDebug("Step 3.4: Executing batch file...");
-        try {
-            tempBatchFile.execute();
-            printDebug("Step 3.4: Batch file executed successfully");
-        } catch (e) {
-            printDebug("ERROR Step 3.4: Failed to execute batch file: " + e.toString());
-            // Xóa batch file tạm thời
-            try {
-                tempBatchFile.remove();
-            } catch (removeErr) {
-                // Bỏ qua
-            }
-            return false;
-        }
-        
-        // Chờ một chút để đảm bảo file được tạo
+        // Wait for output.json to be created
         printDebug("Step 4: Waiting for output.json to be created...");
-        var maxWait = 30; // Tối đa 30 giây
+        var maxWait = 30; // Maximum 30 seconds
         var waitCount = 0;
         while (!outputJsonFile.exists && waitCount < maxWait) {
-            $.sleep(1000); // Chờ 1 giây
+            $.sleep(1000); // Wait 1 second
             waitCount++;
             outputJsonFile = new File(outputJsonPath); // Refresh file reference
         }
         
-        // Kiểm tra file output.json có tồn tại không
+        // Check if output.json exists
         printDebug("Step 5: Checking if output.json was created...");
         if (!outputJsonFile.exists) {
             printDebug("ERROR Step 5: output.json was not created after " + waitCount + " seconds");
-            alert("CorePlugin.exe không tạo file output.json. Vui lòng kiểm tra lại.");
+            alert("CorePlugin.exe did not create output.json file. Please check again.");
             return false;
         }
         printDebug("Step 5: output.json created successfully");
-        
-        // Xóa batch file tạm thời
-        printDebug("Step 6: Cleaning up temporary batch file...");
-        try {
-            if (tempBatchFile.exists) {
-                tempBatchFile.remove();
-                printDebug("Step 6: Temporary batch file removed successfully");
-            }
-        } catch (cleanupErr) {
-            printDebug("WARNING Step 6: Could not remove temporary batch file: " + cleanupErr.toString());
-        }
         
         printDebug("=== runCorePlugin COMPLETED ===");
         return true;
@@ -1559,6 +1636,129 @@ function runCorePlugin(folderPath) {
         printDebug("Error message: " + (err.message || "N/A"));
         alert("Error running CorePlugin.exe: " + err);
         return false;
+    }
+}
+
+// Helper function to select Excel file and read configuration
+// Optional parameter: fileName - name of the file to suggest (user still needs to select in dialog)
+// Returns JSON string with { success: boolean, config: object, error: string }
+function selectAndReadConfigFile(fileName) {
+    try {
+        printDebug("=== selectAndReadConfigFile START ===");
+        if (fileName) {
+            printDebug("Suggested file name: " + fileName);
+        }
+        
+        // Open file dialog to select Excel file
+        var file = File.openDialog("Select Excel Configuration File", "Excel Files:*.xlsx;*.xls");
+        if (file == null) {
+            printDebug("No file selected by user");
+            return JSON.stringify({ success: false, error: "No file selected" });
+        }
+        
+        var excelPath = file.fsName;
+        var excelFileName = file.name;
+        printDebug("Selected Excel file: " + excelPath);
+        printDebug("Excel file name: " + excelFileName);
+        
+        // Read configuration using readConfigFile
+        var config = readConfigFile(excelPath);
+        if (config == null) {
+            printDebug("Failed to read configuration file");
+            return JSON.stringify({ success: false, error: "Failed to read configuration file" });
+        }
+        
+        printDebug("=== selectAndReadConfigFile COMPLETED ===");
+        return JSON.stringify({ success: true, fileName: excelFileName, config: config });
+    } catch (err) {
+        printDebug("=== selectAndReadConfigFile ERROR ===");
+        printDebug("ERROR: " + err.toString());
+        return JSON.stringify({ success: false, error: err.toString() });
+    }
+}
+
+// Function to read Excel configuration file and return config.json content
+function readConfigFile(excelFilePath) {
+    try {
+        printDebug("=== readConfigFile START ===");
+        printDebug("Step 1: Preparing to read Excel configuration file...");
+        printDebug("Step 1.1: Excel file path: " + excelFilePath);
+        
+        // Get folder containing Excel file
+        var excelFile = new File(excelFilePath);
+        if (!excelFile.exists) {
+            printDebug("ERROR: Excel file does not exist: " + excelFilePath);
+            alert("Excel file does not exist: " + excelFilePath);
+            return null;
+        }
+        
+        var excelFolder = excelFile.parent;
+        var excelFolderPath = excelFolder.fsName;
+        printDebug("Step 1.2: Excel folder path: " + excelFolderPath);
+        
+        // Delete config.json if it exists
+        var configJsonPath = excelFolderPath + "\\config.json";
+        var configJsonFile = new File(configJsonPath);
+        printDebug("Step 2: Checking for existing config.json...");
+        if (configJsonFile.exists) {
+            printDebug("Step 2.1: config.json exists, deleting...");
+            configJsonFile.remove();
+            printDebug("Step 2.1: config.json deleted successfully");
+        } else {
+            printDebug("Step 2.1: config.json does not exist - OK");
+        }
+        
+        // Run CorePlugin.exe with -c parameter and Excel file path using common function
+        printDebug("Step 3: Running CorePlugin.exe with -c parameter...");
+        var result = executeCorePlugin(["-c", excelFilePath], excelFolderPath);
+        
+        if (!result.success) {
+            printDebug("ERROR Step 3: Failed to run CorePlugin.exe");
+            alert(result.error);
+            return null;
+        }
+        
+        // Wait for config.json to be created
+        printDebug("Step 4: Waiting for config.json to be created...");
+        var maxWait = 30; // Maximum 30 seconds
+        var waitCount = 0;
+        while (!configJsonFile.exists && waitCount < maxWait) {
+            $.sleep(1000); // Wait 1 second
+            waitCount++;
+            configJsonFile = new File(configJsonPath); // Refresh file reference
+        }
+        
+        // Check if config.json exists
+        printDebug("Step 5: Checking if config.json was created...");
+        if (!configJsonFile.exists) {
+            printDebug("ERROR Step 5: config.json was not created after " + waitCount + " seconds");
+            return null;
+        }
+        printDebug("Step 5: config.json created successfully");
+        
+        // Read config.json file
+        printDebug("Step 6: Reading config.json file...");
+        try {
+            configJsonFile.open("r");
+            var jsonContent = configJsonFile.read();
+            configJsonFile.close();
+            printDebug("Step 6: config.json read successfully");
+            
+            // Parse JSON and return
+            var configData = JSON.parse(jsonContent);
+            printDebug("=== readConfigFile COMPLETED ===");
+            return configData;
+        } catch (readErr) {
+            printDebug("ERROR Step 6: Failed to read config.json: " + readErr.toString());
+            return null;
+        }
+        
+    } catch (err) {
+        printDebug("=== readConfigFile ERROR ===");
+        printDebug("ERROR: " + err.toString());
+        printDebug("Error message: " + (err.message || "N/A"));
+        alert("Error reading Excel configuration file: " + err);
+        return null;
     }
 }
 

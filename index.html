@@ -27,7 +27,10 @@
   <div class="container-fluid">
     <div class="control-group m-1">
       <label class="control-label" for="txtFileConfig">File cấu hình:</label>
-      <input type="file" class="form-control-file" id="txtExcel">
+      <div class="d-flex flex-row">
+        <input type="text" class="form-control form-control-sm" id="txtExcel" readonly placeholder="Chưa chọn file cấu hình">
+        <button class="btn btn-sm btn-primary ml-1" id="btnSelectExcel" type="button">Chọn file</button>
+      </div>
     </div>
     <div class="d-flex flex-row align-content-stretch">
       <div style="flex-basis: 50%">

@@ -261,55 +261,68 @@ function generate(try_mode) {
 
 window.onload = function()
 {
-  // document.getElementById("btnSelectExcel").addEventListener("click", (rs)=>{
-  //   csLib.evalScript("selectExcelFile()", ()=>{
-
-  //   });
-  // });
-  $("#txtExcel").on('change', function(){
-    printDebug("File input changed");
-    let file = this.files[0];
-    if (!file) {
-      printDebug("No file selected");
-      showToast("Không có file được chọn");
-      return;
-    }
+  // Button to select and read Excel configuration file
+  document.getElementById("btnSelectExcel").addEventListener("click", function(){
+    printDebug("btnSelectExcel clicked");
+    showToast("Đang mở hộp thoại chọn file...");
     
-    printDebug(`Selected file: ${file.name}, Size: ${file.size}, Type: ${file.type}`);
-    showToast("Đang đọc file: " + file.name);
+    // Call selectAndReadConfigFile in hostscript.js to select and read Excel file
+    var script = "selectAndReadConfigFile()";
     
-    let reader = new FileReader();
-    reader.onload = function(e) {
+    printDebug("Calling selectAndReadConfigFile via evalScript...");
+    csLib.evalScript(script, (result) => {
       try {
-        printDebug("File read successfully, processing data...");
-        let data = e.target.result;
-        let arr = new Uint8Array(data);
-        printDebug(`Converted to Uint8Array, length: ${arr.length}`);
+        printDebug(`selectAndReadConfigFile result: ${result}`);
         
-        config_info = readConfig(arr);
-        printDebug(`readConfig returned: ${JSON.stringify(config_info)}`);
+        if (!result || result === "") {
+          showToast("Lỗi: Không nhận được kết quả từ hostscript");
+          config_info = null;
+          document.getElementById("txtExcel").value = "";
+          return;
+        }
+        
+        var response = JSON.parse(result);
+        printDebug(`Parsed response: ${JSON.stringify(response)}`);
+        
+        if (!response.success) {
+          printDebug(`ERROR: ${response.error}`);
+          // Don't show error if user cancelled file selection
+          if (response.error !== "No file selected") {
+            showToast("Lỗi: " + (response.error || "Không thể đọc file cấu hình"));
+          }
+          config_info = null;
+          document.getElementById("txtExcel").value = "";
+          return;
+        }
+        
+        // Set file name to textbox
+        if (response.fileName) {
+          document.getElementById("txtExcel").value = response.fileName;
+          printDebug(`File name set to textbox: ${response.fileName}`);
+        }
+        
+        // Set configuration data
+        config_info = response.config;
+        printDebug(`selectAndReadConfigFile returned: ${JSON.stringify(config_info)}`);
         
         if (config_info === null) {
           showToast("Lỗi: Không thể đọc file cấu hình");
+          document.getElementById("txtExcel").value = "";
           return;
         }
         
         showToast("File cấu hình đã được tải thành công!");
         console.log("Config loaded:", config_info);
       } catch (error) {
-        printDebug(`ERROR: Failed to process file: ${error.message}`);
-        showToast("Lỗi khi xử lý file: " + error.message);
+        printDebug(`ERROR: Failed to process result: ${error.message}`);
+        showToast("Lỗi khi xử lý kết quả: " + error.message);
         console.log("Error:", error);
+        config_info = null;
+        document.getElementById("txtExcel").value = "";
       }
-    };
-    
-    reader.onerror = function() {
-      printDebug("ERROR: FileReader failed to read file");
-      showToast("Lỗi khi đọc file");
-    };
-    
-    reader.readAsArrayBuffer(file);
-});
+    });
+  });
+  
   document.getElementById("btnPopulate").addEventListener("click", ()=>generate(false));
   document.getElementById("btnTry").addEventListener("click", ()=>generate(true));
 }
