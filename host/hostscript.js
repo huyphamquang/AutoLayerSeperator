@@ -1650,7 +1650,7 @@ function selectAndReadConfigFile(fileName) {
         }
         
         // Open file dialog to select Excel file
-        var file = File.openDialog("Select Excel Configuration File", "Excel Files:*.xlsx;*.xls");
+        var file = File.openDialog("Select Excel Configuration File", "Excel Files:*.xlsx;*.xls;*.xlsm");
         if (file == null) {
             printDebug("No file selected by user");
             return JSON.stringify({ success: false, error: "No file selected" });
