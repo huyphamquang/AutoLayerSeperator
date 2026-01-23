@@ -1375,6 +1375,54 @@ function setFillLayerColor(r, g, b) {
     }
 }
 
+// Apply Color Overlay effect with MULTIPLY blend mode
+function applyColorOverlay(r, g, b) {
+    try {
+        printDebug("Applying Color Overlay with RGB: " + r + "," + g + "," + b);
+        
+        // Create color descriptor
+        var colorDesc = new ActionDescriptor();
+        colorDesc.putDouble(charIDToTypeID("Rd  "), r);
+        colorDesc.putDouble(charIDToTypeID("Grn "), g);
+        colorDesc.putDouble(charIDToTypeID("Bl  "), b);
+        
+        // Create Color Overlay effect descriptor
+        var colorOverlayDesc = new ActionDescriptor();
+        colorOverlayDesc.putObject(charIDToTypeID("Clr "), charIDToTypeID("RGBC"), colorDesc);
+        colorOverlayDesc.putEnumerated(charIDToTypeID("Md  "), charIDToTypeID("BlnM"), charIDToTypeID("Mltp")); // MULTIPLY mode
+        colorOverlayDesc.putUnitDouble(charIDToTypeID("Opct"), charIDToTypeID("#Prc"), 100); // Opacity 100%
+        colorOverlayDesc.putBoolean(stringIDToTypeID("enabled"), true); // Enable the effect
+        
+        // Get reference to layer effects
+        var ref = new ActionReference();
+        ref.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("layerEffects"));
+        ref.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+        
+        // Get current layer effects (if any)
+        var layerEffectsDesc = new ActionDescriptor();
+        try {
+            layerEffectsDesc = executeActionGet(ref);
+        } catch (e) {
+            // If no layer effects exist, create new descriptor
+            layerEffectsDesc = new ActionDescriptor();
+        }
+        
+        // Add Color Overlay to layer effects
+        layerEffectsDesc.putObject(stringIDToTypeID("colorOverlay"), stringIDToTypeID("colorOverlay"), colorOverlayDesc);
+        
+        // Create main descriptor
+        var mainDesc = new ActionDescriptor();
+        mainDesc.putReference(charIDToTypeID("null"), ref);
+        mainDesc.putObject(charIDToTypeID("T   "), stringIDToTypeID("layerEffects"), layerEffectsDesc);
+        
+        // Execute the action
+        executeAction(charIDToTypeID("setd"), mainDesc, DialogModes.NO);
+        printDebug("Color Overlay applied successfully");
+    } catch (e) {
+        printDebug("Error applying Color Overlay: " + e.toString());
+    }
+}
+
 
 // Common function to find and run CorePlugin.exe
 // Returns an object with: { ErrorCode: number, Message: string|null, ... }
@@ -1942,13 +1990,10 @@ function separateLayers(config) {
             var outputPath = config.texture4_folder + "\\layers\\" + colorLayer.name + ".png";
             exportFile(doc, outputPath, "png", false);
             printDebug("Export completed for: " + colorLayer.name);
-            selectLayerPixels(layerTachLop);
-            layerTachLop.remove();
-            var fillColorLayer = createSolidColorLayer(colorLayer.name);
-            doc.activeLayer = fillColorLayer;
-            fillColorLayer.blendMode = BlendMode.MULTIPLY;
-            printDebug("Layer blend mode set to MULTIPLY");
-            printDebug("Solid color layer created successfully: " + colorLayer.name);
+            
+            // Giữ lại layer tách lớp (giữ blendMode mặc định)
+            doc.activeLayer = layerTachLop;
+            printDebug("Layer kept for color overlay: " + layerTachLop.name);
 
         }
 
@@ -2021,12 +2066,11 @@ function applyColors(config, doc, colors) {
                 }
                 printDebug("PA" + (paIndex + 1).toString() + "- layer " + layerName + " - Color found from file " + colorFile + ": R=" + color[0] + ", G=" + color[1] + ", B=" + color[2]);
 
-                // Set màu cho layer đổ màu
+                // Set màu cho layer đổ màu sử dụng Color Overlay với MULTIPLY mode
                 var colorLayer = findLayerByName(doc, layerName);
                 if (colorLayer != null) {
                     doc.activeLayer = colorLayer;
-                    //setLayerColor(colorLayer, color);
-                    setFillLayerColor(color[0], color[1], color[2]);
+                    applyColorOverlay(color[0], color[1], color[2]);
                 }
             }
 
