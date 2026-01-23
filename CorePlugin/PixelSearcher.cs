@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Text;
+using Newtonsoft.Json;
 
 namespace Plugin.Photoshop.AutoLayerSeperator
 {
@@ -11,25 +12,37 @@ namespace Plugin.Photoshop.AutoLayerSeperator
     {
         public class LayerConfig
         {
+            [JsonProperty("name")]
             public string Name { get; set; }
+            
+            [JsonProperty("hex")]
             public string Hex { get; set; }
+            
+            [JsonProperty("similar")]
             public int Similar { get; set; }
         }
 
         public class PixelResult
         {
+            [JsonProperty("name")]
             public string Name { get; set; }
+            
+            [JsonProperty("x")]
             public int X { get; set; }
+            
+            [JsonProperty("y")]
             public int Y { get; set; }
         }
 
         public class ColorSetting
         {
+            [JsonProperty("layers")]
             public List<LayerConfig> Layers { get; set; }
         }
 
         public class OutputData
         {
+            [JsonProperty("pixels")]
             public List<PixelResult> Pixels { get; set; }
         }
 
@@ -67,97 +80,26 @@ namespace Plugin.Photoshop.AutoLayerSeperator
         {
             string jsonContent = File.ReadAllText(configPath, Encoding.UTF8);
             
-            // Parse JSON đơn giản (có thể dùng Newtonsoft.Json nhưng để đơn giản tự parse)
-            var setting = new ColorSetting { Layers = new List<LayerConfig>() };
-
-            // Parse JSON thủ công
-            jsonContent = jsonContent.Trim();
-            if (!jsonContent.StartsWith("{") || !jsonContent.Contains("\"layers\""))
+            try
             {
-                throw new Exception("Invalid JSON format.");
-            }
-
-            // Tìm mảng layers
-            int layersStart = jsonContent.IndexOf("\"layers\"");
-            if (layersStart == -1)
-            {
-                throw new Exception("Layers array not found in JSON.");
-            }
-
-            int arrayStart = jsonContent.IndexOf('[', layersStart);
-            if (arrayStart == -1)
-            {
-                throw new Exception("Layers array not found.");
-            }
-
-            // Parse từng layer
-            int pos = arrayStart + 1;
-            while (pos < jsonContent.Length)
-            {
-                int objStart = jsonContent.IndexOf('{', pos);
-                if (objStart == -1) break;
-
-                int objEnd = jsonContent.IndexOf('}', objStart);
-                if (objEnd == -1) break;
-
-                string layerJson = jsonContent.Substring(objStart, objEnd - objStart + 1);
-                LayerConfig layer = ParseLayerJson(layerJson);
-                setting.Layers.Add(layer);
-
-                pos = objEnd + 1;
-            }
-
-            return setting;
-        }
-
-        private LayerConfig ParseLayerJson(string json)
-        {
-            var layer = new LayerConfig();
-
-            // Parse name
-            int nameIdx = json.IndexOf("\"name\"");
-            if (nameIdx != -1)
-            {
-                int colonIdx = json.IndexOf(':', nameIdx);
-                int quoteStart = json.IndexOf('"', colonIdx) + 1;
-                int quoteEnd = json.IndexOf('"', quoteStart);
-                layer.Name = json.Substring(quoteStart, quoteEnd - quoteStart);
-            }
-
-            // Parse hex
-            int hexIdx = json.IndexOf("\"hex\"");
-            if (hexIdx != -1)
-            {
-                int colonIdx = json.IndexOf(':', hexIdx);
-                int quoteStart = json.IndexOf('"', colonIdx) + 1;
-                int quoteEnd = json.IndexOf('"', quoteStart);
-                layer.Hex = json.Substring(quoteStart, quoteEnd - quoteStart);
-            }
-
-            // Parse similar
-            int similarIdx = json.IndexOf("\"similar\"");
-            if (similarIdx != -1)
-            {
-                int colonIdx = json.IndexOf(':', similarIdx);
-                int valueStart = colonIdx + 1;
-                while (valueStart < json.Length && char.IsWhiteSpace(json[valueStart])) valueStart++;
-                int valueEnd = valueStart;
-                while (valueEnd < json.Length && char.IsDigit(json[valueEnd])) valueEnd++;
-                if (int.TryParse(json.Substring(valueStart, valueEnd - valueStart), out int similar))
+                ColorSetting setting = JsonConvert.DeserializeObject<ColorSetting>(jsonContent);
+                
+                if (setting == null)
                 {
-                    layer.Similar = similar;
+                    throw new Exception("Failed to deserialize JSON. Result is null.");
                 }
-                else
+                
+                if (setting.Layers == null)
                 {
-                    layer.Similar = 1;
+                    setting.Layers = new List<LayerConfig>();
                 }
+                
+                return setting;
             }
-            else
+            catch (JsonException ex)
             {
-                layer.Similar = 1;
+                throw new Exception($"Invalid JSON format: {ex.Message}", ex);
             }
-
-            return layer;
         }
 
         private Color HexToColor(string hex)
@@ -182,7 +124,7 @@ namespace Plugin.Photoshop.AutoLayerSeperator
             {
                 int width = bitmap.Width;
                 int height = bitmap.Height;
-                Console.WriteLine($"Kích thước ảnh: {width} x {height}");
+                Console.WriteLine($"Dimetions: {width} x {height}");
 
                 // Khóa bitmap để truy cập trực tiếp vùng nhớ
                 BitmapData bitmapData = bitmap.LockBits(
@@ -260,26 +202,13 @@ namespace Plugin.Photoshop.AutoLayerSeperator
 
         private void WriteOutputJson(string outputPath, List<PixelResult> results)
         {
-            StringBuilder json = new StringBuilder();
-            json.AppendLine("{");
-            json.AppendLine("    \"pixels\":");
-            json.AppendLine("    [");
-
-            for (int i = 0; i < results.Count; i++)
+            var outputData = new OutputData
             {
-                var result = results[i];
-                json.Append($"        {{\"name\": \"{result.Name}\", \"x\": {result.X}, \"y\": {result.Y}}}");
-                if (i < results.Count - 1)
-                {
-                    json.Append(",");
-                }
-                json.AppendLine();
-            }
+                Pixels = results
+            };
 
-            json.AppendLine("    ]");
-            json.AppendLine("}");
-
-            File.WriteAllText(outputPath, json.ToString(), Encoding.UTF8);
+            string json = JsonConvert.SerializeObject(outputData, Formatting.Indented);
+            File.WriteAllText(outputPath, json, Encoding.UTF8);
         }
     }
 }

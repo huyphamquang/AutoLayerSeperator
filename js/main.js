@@ -41,13 +41,19 @@ csLib.addEventListener("com.adobe.csxs.events.Application", onCSXSEvent);
 
 
 const toast = document.querySelector(".toast");
-toast.onclick = () => {
-  toast.classList.remove("visible");
-};
+if (toast) {
+  toast.onclick = () => {
+    toast.style.display = "none";
+    toast.classList.remove("visible");
+  };
+}
 function showToast(msg) {
+  if (!toast) return;
   toast.textContent = msg;
+  toast.style.display = "block";
   toast.classList.add("visible");
   setTimeout(() => {
+    toast.style.display = "none";
     toast.classList.remove("visible");
   }, 5000);
 }
@@ -112,8 +118,27 @@ function generate(try_mode) {
   });
 }
 
+// Function to update button states based on config_info
+function updateButtonStates() {
+  var hasConfig = config_info !== null && config_info !== undefined;
+  var btnTry = document.getElementById("btnTry");
+  var btnPopulate = document.getElementById("btnPopulate");
+  
+  if (btnTry) {
+    btnTry.disabled = !hasConfig;
+  }
+  if (btnPopulate) {
+    btnPopulate.disabled = !hasConfig;
+  }
+  
+  printDebug(`Button states updated - hasConfig: ${hasConfig}`);
+}
+
 window.onload = function()
 {
+  // Disable buttons initially
+  updateButtonStates();
+  
   // Button to select and read Excel configuration file
   document.getElementById("btnSelectExcel").addEventListener("click", function(){
     printDebug("btnSelectExcel clicked");
@@ -131,6 +156,7 @@ window.onload = function()
           showToast("Lỗi: Không nhận được kết quả từ hostscript");
           config_info = null;
           document.getElementById("txtExcel").value = "";
+          updateButtonStates();
           return;
         }
         
@@ -141,37 +167,58 @@ window.onload = function()
           printDebug(`ERROR: ${response.error}`);
           // Don't show error if user cancelled file selection
           if (response.error !== "No file selected") {
-            showToast("Lỗi: " + (response.error || "Không thể đọc file cấu hình"));
+            var errorMsg = response.error || "Không thể đọc file cấu hình";
+            showToast("Lỗi đọc file cấu hình:\n" + errorMsg);
           }
           config_info = null;
           document.getElementById("txtExcel").value = "";
+          updateButtonStates();
           return;
         }
         
-        // Set file name to textbox
+        // Set file name to textbox (decode URL encoding if present)
         if (response.fileName) {
-          document.getElementById("txtExcel").value = response.fileName;
-          printDebug(`File name set to textbox: ${response.fileName}`);
+          var displayFileName = response.fileName;
+          // Decode URL encoding (e.g., %20 -> space)
+          try {
+            if (displayFileName.indexOf("%") !== -1) {
+              displayFileName = decodeURIComponent(displayFileName);
+            }
+          } catch (e) {
+            // If decode fails, use original name
+            printDebug("Warning: Could not decode file name: " + e.message);
+          }
+          document.getElementById("txtExcel").value = displayFileName;
+          printDebug(`File name set to textbox: ${displayFileName}`);
         }
         
         // Set configuration data
         config_info = response.config;
         printDebug(`selectAndReadConfigFile returned: ${JSON.stringify(config_info)}`);
         
-        if (config_info === null) {
+        if (config_info === null || config_info === undefined) {
           showToast("Lỗi: Không thể đọc file cấu hình");
           document.getElementById("txtExcel").value = "";
+          updateButtonStates();
           return;
         }
         
-        showToast("File cấu hình đã được tải thành công!");
+        // Show success message - use alert to ensure user sees it
+        var fileName = response.fileName || "N/A";
+        var successMsg = "File cấu hình đã được đọc thành công!\n\nFile: " + fileName;
+        alert(successMsg);
+        showToast("✓ File cấu hình đã được đọc thành công! (" + fileName + ")");
         console.log("Config loaded:", config_info);
+        
+        // Update button states
+        updateButtonStates();
       } catch (error) {
         printDebug(`ERROR: Failed to process result: ${error.message}`);
         showToast("Lỗi khi xử lý kết quả: " + error.message);
         console.log("Error:", error);
         config_info = null;
         document.getElementById("txtExcel").value = "";
+        updateButtonStates();
       }
     });
   });
