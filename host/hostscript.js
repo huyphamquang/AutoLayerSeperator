@@ -407,6 +407,8 @@ var colors = null; //color layer config will be load when execute_generate_file 
 
 
 function readJSONFile(jsonFile) {
+    // Set UTF-8 encoding for Unicode support (Vietnamese characters)
+    jsonFile.encoding = "UTF8";
     jsonFile.open("r");
     var json = jsonFile.read();
     jsonFile.close()
@@ -416,7 +418,7 @@ function readJSONFile(jsonFile) {
 
 
 // Debug mode control
-var DEBUG_MODE = true; // Set to false to disable debug logging
+var DEBUG_MODE = false; // Set to false to disable debug logging
 
 // Debug function for Photoshop environment using CSXSEvent
 function printDebug(message) {
@@ -430,7 +432,6 @@ function printDebug(message) {
         //     timestamp: new Date().toISOString()
         // };
         // csInterface.dispatchEvent(event);
-
         // Write to Photoshop's console for backup
         $.writeln("DEBUG: " + message);
 
@@ -459,6 +460,9 @@ function writeToLogFile(message) {
         // Create log file path on Desktop
         var logFile = new File(Folder.desktop + "/AutoLayerSeparator_Debug.log");
 
+        // Set UTF-8 encoding for Unicode support (Vietnamese characters)
+        logFile.encoding = "UTF8";
+        
         // Open file for appending
         logFile.open("a"); // Append mode
 
@@ -824,16 +828,14 @@ function exportFile(doc, filePath, type, closeAfter) {
             opt.quality = 12;
             break;
         case "png":
-            // Use Save for Web to produce smaller PNGs suitable for web usage
-            var webOpt = new ExportOptionsSaveForWeb();
-            webOpt.format = SaveDocumentType.PNG;
-            webOpt.PNG8 = true; // smaller size than PNG-24
-            webOpt.transparency = true;
-            webOpt.interlaced = false;
-            webOpt.includeProfile = false;
-            doc.exportDocument(new File(filePath), ExportType.SAVEFORWEB, webOpt);
-            if (closeAfter) doc.close(SaveOptions.DONOTSAVECHANGES);
-            return;
+            // Export PNG with highest quality using PNGSaveOptions
+            // This preserves full color depth, transparency, and smooth edges without compression artifacts
+            opt = new PNGSaveOptions();
+            opt.compression = 5; // 0 = no compression (highest quality), 9 = maximum compression
+            opt.interlaced = false; // No interlacing for highest quality
+            // PNGSaveOptions automatically preserves transparency and full color depth (24-bit)
+            // This ensures smooth edges and prevents jagged edges between opaque and transparent areas
+            break;
         case "tiff":
             opt = new TiffSaveOptions();
             opt.jpegQuality = 12;
@@ -1375,52 +1377,57 @@ function setFillLayerColor(r, g, b) {
     }
 }
 
-// Apply Color Overlay effect with MULTIPLY blend mode
-function applyColorOverlay(r, g, b) {
-    try {
-        printDebug("Applying Color Overlay with RGB: " + r + "," + g + "," + b);
-        
-        // Create color descriptor
-        var colorDesc = new ActionDescriptor();
-        colorDesc.putDouble(charIDToTypeID("Rd  "), r);
-        colorDesc.putDouble(charIDToTypeID("Grn "), g);
-        colorDesc.putDouble(charIDToTypeID("Bl  "), b);
-        
-        // Create Color Overlay effect descriptor
-        var colorOverlayDesc = new ActionDescriptor();
-        colorOverlayDesc.putObject(charIDToTypeID("Clr "), charIDToTypeID("RGBC"), colorDesc);
-        colorOverlayDesc.putEnumerated(charIDToTypeID("Md  "), charIDToTypeID("BlnM"), charIDToTypeID("Mltp")); // MULTIPLY mode
-        colorOverlayDesc.putUnitDouble(charIDToTypeID("Opct"), charIDToTypeID("#Prc"), 100); // Opacity 100%
-        colorOverlayDesc.putBoolean(stringIDToTypeID("enabled"), true); // Enable the effect
-        
-        // Get reference to layer effects
-        var ref = new ActionReference();
-        ref.putProperty(charIDToTypeID("Prpr"), stringIDToTypeID("layerEffects"));
-        ref.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
-        
-        // Get current layer effects (if any)
-        var layerEffectsDesc = new ActionDescriptor();
-        try {
-            layerEffectsDesc = executeActionGet(ref);
-        } catch (e) {
-            // If no layer effects exist, create new descriptor
-            layerEffectsDesc = new ActionDescriptor();
-        }
-        
-        // Add Color Overlay to layer effects
-        layerEffectsDesc.putObject(stringIDToTypeID("colorOverlay"), stringIDToTypeID("colorOverlay"), colorOverlayDesc);
-        
-        // Create main descriptor
-        var mainDesc = new ActionDescriptor();
-        mainDesc.putReference(charIDToTypeID("null"), ref);
-        mainDesc.putObject(charIDToTypeID("T   "), stringIDToTypeID("layerEffects"), layerEffectsDesc);
-        
-        // Execute the action
-        executeAction(charIDToTypeID("setd"), mainDesc, DialogModes.NO);
-        printDebug("Color Overlay applied successfully");
-    } catch (e) {
-        printDebug("Error applying Color Overlay: " + e.toString());
+// Apply Color Overlay effect with configurable blend mode
+// Parameters:
+//   r, g, b: RGB color values (0-255)
+//   blendMode: "normal" or "multiply" (default: "multiply")
+function setColorOverlayMultiply(r, g, b, blendMode) {
+    var s2t = function (s) {
+        return app.stringIDToTypeID(s);
+    };
+
+    // Set default blend mode to "multiply" if not specified (for backward compatibility)
+    if (blendMode === undefined || blendMode === null) {
+        blendMode = "multiply";
     }
+    
+    // Validate blend mode - only allow "normal" or "multiply"
+    if (blendMode !== "normal" && blendMode !== "multiply") {
+        printDebug("WARNING: Invalid blend mode '" + blendMode + "'. Using 'multiply' as default.");
+        blendMode = "multiply";
+    }
+
+    var descriptor = new ActionDescriptor();
+    var reference = new ActionReference();
+    
+    // Chỉ định đối tượng tác động là Layer Effects của Layer hiện tại
+    reference.putProperty(s2t("property"), s2t("layerEffects"));
+    reference.putEnumerated(s2t("layer"), s2t("ordinal"), s2t("targetEnum"));
+    descriptor.putReference(s2t("null"), reference);
+
+    var layerEffectsDesc = new ActionDescriptor();
+    var colorOverlayDesc = new ActionDescriptor();
+    
+    // Cấu hình màu sắc (RGB)
+    var colorDesc = new ActionDescriptor();
+    colorDesc.putDouble(s2t("red"), r);
+    colorDesc.putDouble(s2t("grain"), g); // Green
+    colorDesc.putDouble(s2t("blue"), b);
+    
+    colorOverlayDesc.putBoolean(s2t("enabled"), true);
+    
+    // Set blend mode: "normal" or "multiply"
+    colorOverlayDesc.putEnumerated(s2t("mode"), s2t("blendMode"), s2t(blendMode));
+    
+    colorOverlayDesc.putUnitDouble(s2t("opacity"), s2t("percentUnit"), 100);
+    colorOverlayDesc.putObject(s2t("color"), s2t("RGBColor"), colorDesc);
+
+    // Gán hiệu ứng Color Overlay (solidFill) vào danh sách Layer Effects
+    layerEffectsDesc.putObject(s2t("solidFill"), s2t("solidFill"), colorOverlayDesc);
+    descriptor.putObject(s2t("to"), s2t("layerEffects"), layerEffectsDesc);
+
+    // Thực thi lệnh set
+    executeAction(s2t("set"), descriptor, DialogModes.NO);
 }
 
 
@@ -1548,7 +1555,6 @@ function executeCorePlugin(args) {
         for (var i = 0; i < args.length; i++) {
             commandLine += " \"" + args[i] + "\"";
         }
-        
         printDebug("Step 1.7: Command line: " + commandLine);
         
         // Create batch file and execute it
@@ -1559,9 +1565,13 @@ function executeCorePlugin(args) {
             var tempBatchPath = batchWorkingDir + "\\executeCorePlugin_temp_" + timestamp + ".bat";
             var tempBatchFile = new File(tempBatchPath);
             
+            // Set UTF-8 encoding for Unicode support (Vietnamese characters in paths)
+            tempBatchFile.encoding = "UTF8";
+            
             // Create simple batch file
             tempBatchFile.open("w");
             tempBatchFile.write("@echo off\n");
+            tempBatchFile.write("chcp 65001 >nul\n"); // Set UTF-8 code page for Unicode support
             tempBatchFile.write("cd /d \"" + workingDir + "\"\n");
             tempBatchFile.write(commandLine + "\n");
             tempBatchFile.close();
@@ -1600,6 +1610,8 @@ function executeCorePlugin(args) {
             
             // Read and parse CorePluginOutPut.json
             printDebug("Step 5: Reading CorePluginOutPut.json...");
+            // Set UTF-8 encoding for Unicode support (Vietnamese characters)
+            outputStatusFile.encoding = "UTF8";
             outputStatusFile.open("r");
             var jsonContent = outputStatusFile.read();
             outputStatusFile.close();
@@ -1784,6 +1796,8 @@ function readConfigFile(excelFilePath) {
         // Read config.json file
         printDebug("Step 6: Reading config.json file...");
         try {
+            // Set UTF-8 encoding for Unicode support (Vietnamese characters)
+            configJsonFile.encoding = "UTF8";
             configJsonFile.open("r");
             var jsonContent = configJsonFile.read();
             configJsonFile.close();
@@ -1883,6 +1897,8 @@ function separateLayers(config) {
         
         // Đọc và parse JSON
         printDebug("Step 2.1: Reading JSON content...");
+        // Set UTF-8 encoding for Unicode support (Vietnamese characters)
+        outputJsonFile.encoding = "UTF8";
         outputJsonFile.open("r");
         var jsonContent = outputJsonFile.read();
         outputJsonFile.close();
@@ -1985,6 +2001,7 @@ function separateLayers(config) {
             // Ẩn tất cả layer ngoài layer vừa tạo
             printDebug("Hiding all layers except: " + layerTachLop.name);
             hideAllLayersExcept(doc, layerTachLopId);
+            setColorOverlayMultiply(0, 0, 255, "normal");
 
             // Export ra file png
             var outputPath = config.texture4_folder + "\\layers\\" + colorLayer.name + ".png";
@@ -2070,7 +2087,7 @@ function applyColors(config, doc, colors) {
                 var colorLayer = findLayerByName(doc, layerName);
                 if (colorLayer != null) {
                     doc.activeLayer = colorLayer;
-                    applyColorOverlay(color[0], color[1], color[2]);
+                    setColorOverlayMultiply(color[0], color[1], color[2]);
                 }
             }
 

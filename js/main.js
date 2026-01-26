@@ -50,11 +50,17 @@ if (toast) {
 function showToast(msg) {
   if (!toast) return;
   toast.textContent = msg;
+  // Set display to block first, then add visible class for animation
   toast.style.display = "block";
+  // Force reflow to ensure display change is applied
+  toast.offsetHeight;
   toast.classList.add("visible");
   setTimeout(() => {
-    toast.style.display = "none";
     toast.classList.remove("visible");
+    // Small delay before hiding to allow fade-out animation
+    setTimeout(() => {
+      toast.style.display = "none";
+    }, 300);
   }, 5000);
 }
 
@@ -142,7 +148,6 @@ window.onload = function()
   // Button to select and read Excel configuration file
   document.getElementById("btnSelectExcel").addEventListener("click", function(){
     printDebug("btnSelectExcel clicked");
-    showToast("Đang mở hộp thoại chọn file...");
     
     // Call selectAndReadConfigFile in hostscript.js to select and read Excel file
     var script = "selectAndReadConfigFile()";
@@ -205,9 +210,9 @@ window.onload = function()
         
         // Show success message - use alert to ensure user sees it
         var fileName = response.fileName || "N/A";
-        var successMsg = "File cấu hình đã được đọc thành công!\n\nFile: " + fileName;
+        var successMsg = "File cấu hình đã được đọc thành công!";
         alert(successMsg);
-        showToast("✓ File cấu hình đã được đọc thành công! (" + fileName + ")");
+        // Removed showToast() since alert() is already shown above
         console.log("Config loaded:", config_info);
         
         // Update button states

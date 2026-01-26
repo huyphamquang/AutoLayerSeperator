@@ -27,3 +27,31 @@ h1 {
 div.navbar {
   margin: 0px !important;
 }
+
+/* Toast box floating style - using !important to override Bootstrap */
+.alert.toast {
+  position: fixed !important;
+  top: 10px !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translateX(-50%) translateY(-20px) !important;
+  z-index: 9999 !important;
+  min-width: 200px !important;
+  max-width: 90% !important;
+  margin: 0 !important;
+  padding: 12px 16px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.alert.toast.visible {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateX(-50%) translateY(0) !important;
+}
