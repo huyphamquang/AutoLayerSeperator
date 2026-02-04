@@ -14,9 +14,9 @@
 * written permission of Adobe. 
 **************************************************************************/
 -->
-<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ExtensionBundleId="com.pqh.autolayerseperator" ExtensionBundleName="AutoLayerSeperator" ExtensionBundleVersion="1.0.0" Version="6.0" allowExternalProcess="true">
+<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ExtensionBundleId="com.pqh.autolayerseperator.license" ExtensionBundleName="AutoLayerSeperatorOnly" ExtensionBundleVersion="1.0.0" Version="6.0" allowExternalProcess="true">
 	<ExtensionList>
-		<Extension Id="com.pqh.autolayerseperator.extension" Version="1.0"/>
+		<Extension Id="com.pqh.autolayerseperator.license.extension" Version="1.0"/>
 	</ExtensionList>
 	<ExecutionEnvironment>
 		<HostList>
@@ -34,7 +34,7 @@
 		</CEFCommandLine>
 	</ExecutionEnvironment>
 	<DispatchInfoList>
-		<Extension Id="com.pqh.autolayerseperator.extension">
+		<Extension Id="com.pqh.autolayerseperator.license.extension">
 			<DispatchInfo>
 				<Resources>
 					<MainPath>./index.html</MainPath>
@@ -45,14 +45,14 @@
 				</Lifecycle>
 				<UI>
 					<Type>Panel</Type>
-					<Menu>Tách lớp-thuyết minh công trình</Menu>
+					<Menu>Tách lớp</Menu>
 					<Geometry>
 						<Size>
                             <Height>250</Height>
                             <Width>300</Width>
                         </Size>
                         <MinSize>
-                            <Height>210</Height>
+                            <Height>150</Height>
                             <Width>250</Width>
                         </MinSize>
 					</Geometry>

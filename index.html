@@ -25,50 +25,20 @@
 
 <body>
   <div class="container-fluid">
-    <div class="control-group m-1">
-      <label class="control-label" for="txtFileConfig">File cấu hình:</label>
-      <div class="d-flex flex-row">
-        <input type="text" class="form-control form-control-sm" id="txtExcel" readonly placeholder="Chưa chọn file cấu hình">
-        <button class="btn btn-sm btn-primary ml-1" id="btnSelectExcel" type="button">Chọn file</button>
-      </div>
-    </div>
-    <div class="d-flex flex-row align-content-stretch">
-      <div style="flex-basis: 50%">
-        <div class="control-group m-1">
-          <label class="control-label>">Kiểu xuất file:</label for="cbSaveAs">
-          <select class="form-control form-control-sm" id="cbSaveAs">
-            <option>JPG</option>
-            <option>PSD</option>
-            <option>PNG</option>
-            <option>TIFF</option>
-          </select>
-        </div>
-      </div>
-      <div style="flex-basis: 50%">
-        <div class="control-group m-1">
-          <label class="control-label>">Phương án:</label for="cbPA">
-          <select class="form-control form-control-sm" id="cbPA">
-            <option>Tất cả</option>
-            <option>1</option>
-            <option>2</option>
-            <option>3</option>
-            <option>4</option>
-            <option>5</option>
-            <option>6</option>
-            <option>7</option>
-            <option>8</option>
-          </select>
-        </div>
-      </div>
 
+    <label class="control-label m-1" for="txtFileConfig">File cấu hình:</label>
+    <div class="m-1">
+      <input type="text" class="form-control form-control-sm" id="txtExcel" readonly placeholder="Chưa chọn file cấu hình">
     </div>
 
   </div>
+  <div class="m-3">
+    <button class="btn btn-sm btn-primary btn-block" id="btnSelectExcel" type="button">Chọn file</button>
+  </div>
 
-  <div class="m-1">
-    <button class="btn btn-sm btn-secondary btn-block" id="btnTry" type="button" disabled>Tạo thử</button>
-    <button class="btn btn-sm btn-warning btn-block" id="btnPopulate" type="button" disabled>Tạo thuyết minh</button>
-    <span class="badge badge-info">Version 1.2.5</span>
+  <div class="m-3">
+    <button class="btn btn-sm btn-warning btn-block" id="btnPopulate" type="button" disabled>Tách lớp</button>
+    <span class="badge badge-info">Version 1.0.0</span>
   </div>
   
   <!-- Toast box moved outside container for proper floating -->

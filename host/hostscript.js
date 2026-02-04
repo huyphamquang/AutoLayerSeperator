@@ -1443,7 +1443,10 @@ function executeCorePlugin(args) {
         
         // Find CorePlugin.exe in plugin directory
         var pluginFolder = null;
-        var pluginName = "AutoLayerSeperator";
+        // Extension folder name (under Adobe CEP\\extensions)
+        // Example production path:
+        //   C:\\Program Files (x86)\\Common Files\\Adobe\\CEP\\extensions\\AutoLayerSeperatorLicense
+        var pluginName = "AutoLayerSeperatorLicense";
         
         printDebug("Step 1.2: Searching for plugin directory...");
         
@@ -1504,20 +1507,35 @@ function executeCorePlugin(args) {
             };
         }
         
-        var corePluginPath = pluginFolder.fsName + "\\CorePlugin.exe";
-        var corePluginFile = new File(corePluginPath);
+        // CorePlugin.exe is deployed under the /dist subfolder of the plugin directory
+        var corePluginPathDist = pluginFolder.fsName + "\\dist\\CorePlugin.exe";
+        var corePluginFile = new File(corePluginPathDist);
+        var corePluginPath = corePluginPathDist;
         
         printDebug("Step 1.2.8: Plugin directory: " + pluginFolder.fsName);
-        printDebug("Step 1.2.9: CorePlugin.exe path: " + corePluginPath);
+        printDebug("Step 1.2.9: CorePlugin.exe dist path: " + corePluginPathDist);
+        
+        // Fallback: support development layout where CorePlugin.exe is in plugin root
+        if (!corePluginFile.exists) {
+            var corePluginPathRoot = pluginFolder.fsName + "\\CorePlugin.exe";
+            var corePluginFileRoot = new File(corePluginPathRoot);
+            printDebug("Step 1.2.10: CorePlugin.exe root path (fallback): " + corePluginPathRoot);
+            
+            if (corePluginFileRoot.exists) {
+                corePluginFile = corePluginFileRoot;
+                corePluginPath = corePluginPathRoot;
+                printDebug("Step 1.2.11: Using CorePlugin.exe from plugin root (development mode).");
+            }
+        }
         
         if (!corePluginFile.exists) {
-            printDebug("ERROR Step 1.2: CorePlugin.exe not found at: " + corePluginPath);
+            printDebug("ERROR Step 1.2: CorePlugin.exe not found at dist or root path.");
             return {
                 ErrorCode: 404,
-                Message: "CorePlugin.exe file not found at: " + corePluginPath
+                Message: "CorePlugin.exe file not found under plugin directory (dist or root)."
             };
         }
-        printDebug("Step 1.2: CorePlugin.exe found - OK");
+        printDebug("Step 1.2: CorePlugin.exe found - OK at: " + corePluginPath);
         
         // Determine working directory from first argument if it's a folder
         var workingDir = Folder.temp.fsName; // Default to temp
@@ -2483,43 +2501,9 @@ function execute_generate_file(config) {
             return false;
         }
 
-        // Bước 4: Đổ màu cho các phương án
-        if (!applyColors(config, doc, colors)) {
-            return false;
-        }
-
-        // Bước 5: Xuất báo cáo thuyết minh (thực hiện như cũ)
-        var template_file_path = config.template_file;
-        var doc = openTemplateFile(config);
-        if (doc == null) {
-            alert("Khong mo duoc file template");
-            return false;
-        }
-        if (doc.saved == false) {
-            alert("File template da bi thay doi, ghi lai hoac huy thay doi truoc khi thuc hien.");
-            return false;
-        }
-
-        if (config.first_pa) {
-            if (generateDocFromConfig(config, doc, 0, false)) {
-                alert("Đã thực hiện xong!");
-                return true;
-            }
-            else return false;
-        }
-        else {
-            if (config.selected_pa > 0) {
-                var template = doc.duplicate();
-                if (!generateDocFromConfig(config, template, config.selected_pa - 1, true)) return false;
-            }
-            else
-                for (var i = 0; i < config.ds_pa.length; i++) {
-                    var template = doc.duplicate();
-                    if (!generateDocFromConfig(config, template, i, true)) return false;
-                }
-            alert("Đã thực hiện xong!");
-            return true;
-        }
+        // Plugin hiện tại chỉ chạy đến bước tách lớp
+        alert("Đã thực hiện tách lớp xong!");
+        return true;
 
     } catch (err) {
         alert("Lỗi trong quá trình thực hiện: " + err);

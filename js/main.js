@@ -90,28 +90,12 @@ function generate(try_mode) {
     return;
   }
 
-  printDebug("config_info is valid, proceeding with generation");
-  printDebug(`config_info.ds_pa length: ${config_info.ds_pa ? config_info.ds_pa.length : "undefined"}`);
-  
-  config_info.save_as = document.getElementById("cbSaveAs").value;
-  config_info.first_pa = try_mode;
-  config_info.selected_pa = document.getElementById("cbPA").selectedIndex;
-  
-  printDebug("Updated config_info:");
-  printDebug(`  save_as: ${config_info.save_as}`);
-  printDebug(`  first_pa: ${config_info.first_pa}`);
-  printDebug(`  selected_pa: ${config_info.selected_pa}`);
-  
-  if (try_mode == false && config_info.selected_pa > config_info.ds_pa.length ){
-    printDebug("Selected PA index exceeds available PAs");
-    alert("File cấu hình chỉ có "+ config_info.ds_pa.length + " phương án.");
-    return;
-  }
+  printDebug("config_info is valid, proceeding with generation (separate layers only)");
   
   var script = `execute_generate_file(${JSON.stringify(config_info)})`;
   printDebug(`Executing script: ${script}`);
   console.log("Executing script:", script);
-  showToast("Đang thực hiện tạo file...");
+  showToast("Đang thực hiện tách lớp...");
   
   csLib.evalScript(script, (rs)=>{
     printDebug(`Script execution result: ${rs}`);
