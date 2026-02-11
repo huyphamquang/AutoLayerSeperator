@@ -25,6 +25,7 @@ namespace Plugin.Photoshop.AutoLayerSeperator
                     Console.WriteLine("Usage:");
                     Console.WriteLine("  CorePlugin.exe <folder_path>");
                     Console.WriteLine("  CorePlugin.exe -c <excel_file_path>");
+                    Console.WriteLine("  CorePlugin.exe -webp <folder_path>");
                 }
 
                 // Nếu có từ 2 tham số và tham số đầu là -c, đọc file cấu hình Excel
@@ -59,6 +60,50 @@ namespace Plugin.Photoshop.AutoLayerSeperator
                         Console.WriteLine();
                         Console.WriteLine($"ERROR: Error during configuration reading: {ex.Message}");
                         Console.WriteLine($"Details: {ex}");
+                    }
+                }
+
+                // Nếu có từ 2 tham số và tham số đầu là -webp, convert PNG sang WebP
+                if (args.Length >= 2 && args[0] == "-webp")
+                {
+                    string folderPath = args[1];
+                    Console.WriteLine($"Converting PNG files to WebP in folder: {folderPath}");
+
+                    // Kiểm tra thư mục có tồn tại không
+                    if (!Directory.Exists(folderPath))
+                    {
+                        errorCode = 1;
+                        errorMessage = $"Folder does not exist: {folderPath}";
+                        Console.WriteLine($"ERROR: Folder does not exist: {folderPath}");
+                    }
+                    else
+                    {
+                        try
+                        {
+                            WebPConverter converter = new WebPConverter();
+                            int convertedCount = converter.ConvertPngToWebP(folderPath);
+
+                            if (convertedCount > 0)
+                            {
+                                Console.WriteLine();
+                                Console.WriteLine($"Successfully converted {convertedCount} PNG file(s) to WebP format.");
+                                errorCode = 0;
+                            }
+                            else
+                            {
+                                Console.WriteLine();
+                                Console.WriteLine("No PNG files found to convert.");
+                                errorCode = 0; // Không phải lỗi nếu không có file PNG
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            errorCode = 500;
+                            errorMessage = ex.ToString();
+                            Console.WriteLine();
+                            Console.WriteLine($"ERROR: Error during PNG to WebP conversion: {ex.Message}");
+                            Console.WriteLine($"Details: {ex}");
+                        }
                     }
                 }
 
@@ -131,7 +176,7 @@ namespace Plugin.Photoshop.AutoLayerSeperator
                 }
 
                 // Trường hợp không hợp lệ
-                if (args.Length > 0 && args.Length != 1 && !(args.Length >= 2 && args[0] == "-c"))
+                if (args.Length > 0 && args.Length != 1 && !(args.Length >= 2 && (args[0] == "-c" || args[0] == "-webp")))
                 {
                     errorCode = 1;
                     errorMessage = "Invalid parameters.";
@@ -139,6 +184,7 @@ namespace Plugin.Photoshop.AutoLayerSeperator
                     Console.WriteLine("Usage:");
                     Console.WriteLine("  CorePlugin.exe <folder_path>");
                     Console.WriteLine("  CorePlugin.exe -c <excel_file_path>");
+                    Console.WriteLine("  CorePlugin.exe -webp <folder_path>");
                 }
             }
             catch (Exception ex)

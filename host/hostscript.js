@@ -418,7 +418,7 @@ function readJSONFile(jsonFile) {
 
 
 // Debug mode control
-var DEBUG_MODE = false; // Set to false to disable debug logging
+var DEBUG_MODE = true; // Set to false to disable debug logging
 
 // Debug function for Photoshop environment using CSXSEvent
 function printDebug(message) {
@@ -817,8 +817,10 @@ function findInfolder(file_name, allow_exts, folders) {
     return null;
 }
 
+
 function exportFile(doc, filePath, type, closeAfter) {
     var opt = null;
+    
     switch (type.toLowerCase()) {
         case "psd":
             opt = new PhotoshopSaveOptions();
@@ -828,10 +830,10 @@ function exportFile(doc, filePath, type, closeAfter) {
             opt.quality = 12;
             break;
         case "png":
-            // Export PNG with highest quality using PNGSaveOptions
+            // Export PNG with no compression to preserve maximum quality
             // This preserves full color depth, transparency, and smooth edges without compression artifacts
             opt = new PNGSaveOptions();
-            opt.compression = 5; // 0 = no compression (highest quality), 9 = maximum compression
+            opt.compression = 0; // 0 = no compression (highest quality), 9 = maximum compression
             opt.interlaced = false; // No interlacing for highest quality
             // PNGSaveOptions automatically preserves transparency and full color depth (24-bit)
             // This ensures smooth edges and prevents jagged edges between opaque and transparent areas
@@ -841,9 +843,13 @@ function exportFile(doc, filePath, type, closeAfter) {
             opt.jpegQuality = 12;
             break;
     }
+    
     //inspectValue(filePath);
     //inspectValue(opt);
+    
+    // All formats use saveAs
     doc.saveAs(new File(filePath), opt, true);
+    
     if (closeAfter) doc.close(SaveOptions.DONOTSAVECHANGES);
 }
 
@@ -2001,12 +2007,11 @@ function separateLayers(config) {
             // Ẩn tất cả layer ngoài layer vừa tạo
             printDebug("Hiding all layers except: " + layerTachLop.name);
             hideAllLayersExcept(doc, layerTachLopId);
-            setColorOverlayMultiply(0, 0, 255, "normal");
 
-            // Export ra file png
+            // Export ra file PNG không nén để giữ nguyên chất lượng
             var outputPath = config.texture4_folder + "\\layers\\" + colorLayer.name + ".png";
             exportFile(doc, outputPath, "png", false);
-            printDebug("Export completed for: " + colorLayer.name);
+            printDebug("Export completed for: " + colorLayer.name + ".png");
             
             // Giữ lại layer tách lớp (giữ blendMode mặc định)
             doc.activeLayer = layerTachLop;
@@ -2023,6 +2028,23 @@ function separateLayers(config) {
             printDebug("ID layer removed successfully");
         } else {
             printDebug("WARNING: Could not find ID layer to delete with ID: " + idLayerId);
+        }
+
+        // Sau khi export xong tất cả layers, convert PNG sang WebP bằng CorePlugin.exe
+        printDebug("=== Converting PNG files to WebP using CorePlugin.exe ===");
+        var layersFolderPath = config.texture4_folder + "\\layers";
+        printDebug("Layers folder path: " + layersFolderPath);
+        
+        var convertResult = executeCorePlugin(["-webp", layersFolderPath]);
+        
+        if (convertResult.ErrorCode !== undefined && convertResult.ErrorCode !== 0) {
+            printDebug("WARNING: PNG to WebP conversion failed with ErrorCode: " + convertResult.ErrorCode);
+            var errorMsg = convertResult.Message || "Unknown error";
+            printDebug("Conversion error message: " + errorMsg);
+            // Không throw error, chỉ log warning vì PNG files đã được export thành công
+            alert("Cảnh báo: Chuyển đổi PNG sang WebP thất bại:\n\nError Code: " + convertResult.ErrorCode + "\nMessage: " + errorMsg + "\n\nCác file PNG đã được export thành công.");
+        } else {
+            printDebug("PNG to WebP conversion completed successfully");
         }
 
         return doc;
