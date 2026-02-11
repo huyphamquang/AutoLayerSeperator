@@ -50,13 +50,20 @@
     <Compile Include="PixelSearcher.cs" />
     <Compile Include="ConfigurationReader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="WebPConverter.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <Content Include="color_setting.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="EPPlus" Version="7.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="SkiaSharp">
+      <Version>3.119.2</Version>
+    </PackageReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

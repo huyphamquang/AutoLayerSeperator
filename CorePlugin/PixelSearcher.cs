@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Text;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace Plugin.Photoshop.AutoLayerSeperator
@@ -42,6 +43,22 @@ namespace Plugin.Photoshop.AutoLayerSeperator
 
         public class OutputData
         {
+            /// <summary>
+            /// Danh sách tên layer (ds_layer) xuất hiện trong file ID,
+            /// lấy từ cấu hình màu (ColorSetting.Layers.Name)
+            /// </summary>
+            [JsonProperty("ds_layer")]
+            public List<string> DsLayer { get; set; }
+
+            /// <summary>
+            /// Thư mục chứa file ID (texture4_folder)
+            /// </summary>
+            [JsonProperty("texture4_folder")]
+            public string Texture4Folder { get; set; }
+
+            /// <summary>
+            /// Danh sách điểm ảnh được tìm thấy cho từng layer
+            /// </summary>
             [JsonProperty("pixels")]
             public List<PixelResult> Pixels { get; set; }
         }
@@ -70,10 +87,19 @@ namespace Plugin.Photoshop.AutoLayerSeperator
             Console.WriteLine("Reading image and searching for pixels...");
             List<PixelResult> results = FindPixelsOptimized(imagePath, colorToLayerMap, targetColors);
 
-            // Ghi kết quả ra file JSON
+            // Chuẩn bị ds_layer (tên layer) và texture4_folder (thư mục chứa file ID)
+            List<string> dsLayer = colorSetting.Layers
+                .Where(l => !string.IsNullOrWhiteSpace(l.Name))
+                .Select(l => l.Name)
+                .ToList();
+
+            string texture4Folder = Path.GetDirectoryName(imagePath);
+
+            // Ghi kết quả ra file JSON với định dạng:
+            // { ds_layer: [], texture4_folder: "", pixels: [] }
             Console.WriteLine();
             Console.WriteLine($"Found {results.Count} pixels.");
-            WriteOutputJson(outputPath, results);
+            WriteOutputJson(outputPath, results, dsLayer, texture4Folder);
         }
 
         private ColorSetting ReadColorSetting(string configPath)
@@ -200,11 +226,13 @@ namespace Plugin.Photoshop.AutoLayerSeperator
             return deltaR <= tolerance && deltaG <= tolerance && deltaB <= tolerance;
         }
 
-        private void WriteOutputJson(string outputPath, List<PixelResult> results)
+        private void WriteOutputJson(string outputPath, List<PixelResult> results, List<string> dsLayer, string texture4Folder)
         {
             var outputData = new OutputData
             {
-                Pixels = results
+                DsLayer = dsLayer ?? new List<string>(),
+                Texture4Folder = texture4Folder ?? string.Empty,
+                Pixels = results ?? new List<PixelResult>()
             };
 
             string json = JsonConvert.SerializeObject(outputData, Formatting.Indented);

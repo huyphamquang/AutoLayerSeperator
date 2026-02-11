@@ -984,12 +984,12 @@ function deleteFolderRecursively(folder) {
     }
 }
 
-// Bước 2: Tạo các folder output
+// Bước 2: Tạo folder output cho kết quả tách lớp
 function createOutputFolders(config) {
     try {
-        printDebug("Creating output folders...");
+        printDebug("Creating output folders (layers only)...");
 
-        // Tạo folder layers
+        // Tạo folder layers để lưu kết quả tách lớp
         var layersFolder = new Folder(config.texture4_folder + "\\layers");
         if (layersFolder.exists) {
             printDebug("Layers folder exists, deleting recursively: " + layersFolder.fsName);
@@ -1000,18 +1000,7 @@ function createOutputFolders(config) {
         layersFolder.create();
         printDebug("Layers folder created: " + layersFolder.fsName);
 
-        // Tạo folder PATK
-        var patkFolder = new Folder(config.texture4_folder + "\\PATK");
-        if (patkFolder.exists) {
-            printDebug("PATK folder exists, deleting recursively: " + patkFolder.fsName);
-            if (!deleteFolderRecursively(patkFolder)) {
-                printDebug("WARNING: Failed to delete existing PATK folder");
-            }
-        }
-        patkFolder.create();
-        printDebug("PATK folder created: " + patkFolder.fsName);
-
-        printDebug("Output folders created successfully");
+        printDebug("Output folder (layers) created successfully");
         return true;
     } catch (err) {
         printDebug("ERROR in createOutputFolders: " + err.toString());
@@ -1787,7 +1776,7 @@ function prepareConfigFromIdFile(idPath) {
         var folderPath = idFile.parent.fsName;
         printDebug("ID folder: " + folderPath);
 
-        // Gọi CorePlugin.exe với đường dẫn đầy đủ tới file ID (để tạo output.json, chọn điểm magic wand...)
+        // Gọi CorePlugin.exe với đường dẫn đầy đủ tới file ID (tạo output.json chứa ds_layer, texture4_folder, pixels)
         var result = executeCorePlugin([idPath]);
         if (result.ErrorCode !== undefined && result.ErrorCode !== 0) {
             var errorMsg = result.Message || "CorePlugin thất bại";
@@ -1795,104 +1784,37 @@ function prepareConfigFromIdFile(idPath) {
             return JSON.stringify({ success: false, error: errorMsg, config: null });
         }
 
-        // Xác định file color_setting.json cần dùng (thư mục ID hoặc default CorePlugin)
-        var colorSettingPath = folderPath + "\\color_setting.json";
-        var colorSettingFile = new File(colorSettingPath);
-
-        if (!colorSettingFile.exists) {
-            printDebug("color_setting.json not found in ID folder: " + colorSettingPath);
-
-            // Tìm thư mục plugin giống executeCorePlugin để lấy file mặc định
-            var pluginFolder = null;
-            var pluginName = "AutoLayerSeperatorLicense";
-            var cepBasePaths = [];
-
-            try {
-                var userDataPath = Folder.userData.fsName + "\\Adobe\\CEP\\extensions";
-                cepBasePaths.push(userDataPath);
-            } catch (e) {}
-
-            try {
-                var commonFilesPath = Folder.commonFiles.fsName + "\\Adobe\\CEP\\extensions";
-                cepBasePaths.push(commonFilesPath);
-            } catch (e) {}
-
-            cepBasePaths.push("C:\\Program Files (x86)\\Common Files\\Adobe\\CEP\\extensions");
-            cepBasePaths.push("C:\\Program Files\\Common Files\\Adobe\\CEP\\extensions");
-
-            for (var i = 0; i < cepBasePaths.length && !pluginFolder; i++) {
-                var testPath = cepBasePaths[i] + "\\" + pluginName;
-                var manifestPath = testPath + "\\CSXS\\manifest.xml";
-                var manifestFile = new File(manifestPath);
-                if (manifestFile.exists) {
-                    pluginFolder = new Folder(testPath);
-                }
-            }
-
-            if (!pluginFolder) {
-                var scriptFile = new File($.fileName);
-                var hostFolder = scriptFile.parent;
-                var testFolder = hostFolder.parent;
-                var manifestPath2 = testFolder.fsName + "\\CSXS\\manifest.xml";
-                var manifestFile2 = new File(manifestPath2);
-                if (manifestFile2.exists) {
-                    pluginFolder = testFolder;
-                }
-            }
-
-            if (pluginFolder) {
-                var defaultColorSettingPath = pluginFolder.fsName + "\\dist\\color_setting.json";
-                var defaultColorSettingFile = new File(defaultColorSettingPath);
-                if (!defaultColorSettingFile.exists) {
-                    // thử ở root plugin
-                    defaultColorSettingPath = pluginFolder.fsName + "\\color_setting.json";
-                    defaultColorSettingFile = new File(defaultColorSettingPath);
-                }
-
-                if (defaultColorSettingFile.exists) {
-                    printDebug("Using default color_setting.json from plugin: " + defaultColorSettingPath);
-                    colorSettingFile = defaultColorSettingFile;
-                } else {
-                    var errMsg = "Không tìm thấy color_setting.json trong thư mục ID và cũng không tìm thấy file mặc định trong plugin";
-                    printDebug(errMsg);
-                    return JSON.stringify({ success: false, error: errMsg, config: null });
-                }
-            } else {
-                var errMsg2 = "Không xác định được thư mục plugin để lấy color_setting.json mặc định";
-                printDebug(errMsg2);
-                return JSON.stringify({ success: false, error: errMsg2, config: null });
-            }
+        // Đọc file output.json do CorePlugin tạo ra trong cùng thư mục với ID
+        var outputJsonPath = folderPath + "\\output.json";
+        var outputJsonFile = new File(outputJsonPath);
+        if (!outputJsonFile.exists) {
+            var errMsgOut = "Không tìm thấy file output.json trong thư mục chứa file ID sau khi chạy CorePlugin.";
+            printDebug(errMsgOut + " Path: " + outputJsonPath);
+            return JSON.stringify({ success: false, error: errMsgOut, config: null });
         }
 
-        // Đọc color_setting.json để lấy ds_layer
-        colorSettingFile.encoding = "UTF8";
-        colorSettingFile.open("r");
-        var colorJson = colorSettingFile.read();
-        colorSettingFile.close();
-        var colorData = JSON.parse(colorJson);
-        if (!colorData.layers || !(colorData.layers instanceof Array)) {
-            return JSON.stringify({ success: false, error: "color_setting.json không có mảng layers", config: null });
+        outputJsonFile.encoding = "UTF8";
+        outputJsonFile.open("r");
+        var outputJsonContent = outputJsonFile.read();
+        outputJsonFile.close();
+
+        var config = null;
+        try {
+            config = JSON.parse(outputJsonContent);
+        } catch (parseErr) {
+            var errMsgParse = "Không thể parse nội dung output.json: " + parseErr.toString();
+            printDebug(errMsgParse);
+            return JSON.stringify({ success: false, error: errMsgParse, config: null });
         }
 
-        var ds_layer = [];
-        for (var j = 0; j < colorData.layers.length; j++) {
-            var name = colorData.layers[j].name;
-            if (name) ds_layer.push(name);
+        if (!config) {
+            var errMsgEmpty = "Dữ liệu config đọc từ output.json là null/undefined.";
+            printDebug(errMsgEmpty);
+            return JSON.stringify({ success: false, error: errMsgEmpty, config: null });
         }
 
-        var config = {
-            ds_layer: ds_layer,
-            ds_pa: null,
-            texture1_folder: null,
-            texture2_folder: null,
-            material_folder: null,
-            template_file: null,
-            texture4_folder: folderPath,
-            agency_name: null,
-            create_date: null,
-            ma_cong_trinh: null,
-            id_file_path: idPath
-        };
+        // Bổ sung đường dẫn file ID vào config để sử dụng phía Photoshop nếu cần
+        config.id_file_path = idPath;
 
         printDebug("=== prepareConfigFromIdFile COMPLETED ===");
         return JSON.stringify({ success: true, config: config, error: null });
@@ -2024,30 +1946,30 @@ function separateLayers(config) {
     try {
         printDebug("=== SEPARATE LAYERS START ===");
 
-        // Mở file "file tach lop.psd"
-        var tachLopFile = new File(config.texture4_folder + "\\file tach lop.psd");
-        printDebug("Looking for file: " + tachLopFile.fsName);
+        // Mở file thiết kế gốc "goc.jpg" (cùng thư mục với file ID) và dùng làm tài liệu nền để tách lớp
+        var baseFile = new File(config.texture4_folder + "\\goc.jpg");
+        printDebug("Looking for base design file (goc.jpg): " + baseFile.fsName);
 
-        if (!tachLopFile.exists) {
-            printDebug("ERROR: File does not exist: " + tachLopFile.fsName);
-            alert("Không tìm thấy file 'file tach lop.psd' trong thư mục " + config.texture4_folder);
+        if (!baseFile.exists) {
+            printDebug("ERROR: Base design file does not exist: " + baseFile.fsName);
+            alert("Không tìm thấy file 'goc.jpg' trong thư mục " + config.texture4_folder);
             return null;
         }
 
-        printDebug("File exists, opening...");
-        var doc = open(tachLopFile);
+        printDebug("Base design file exists, opening...");
+        var doc = open(baseFile);
         if (doc == null) {
-            printDebug("ERROR: Failed to open file");
-            alert("Không thể mở file 'file tach lop.psd'");
+            printDebug("ERROR: Failed to open base design file (goc.jpg)");
+            alert("Không thể mở file 'goc.jpg'");
             return null;
         }
 
-        printDebug("File opened successfully. Document name: " + doc.name);
+        printDebug("Base design file opened successfully. Document name: " + doc.name);
         printDebug("Document has " + doc.layers.length + " layers");
 
-        // Export the opened file to ngoaithat_nen.jpg
+        // Export bản nền ban đầu ra ngoaithat_nen.jpg trong thư mục layers để tham chiếu
         var exportPath = config.texture4_folder + "\\layers\\ngoaithat_nen.jpg";
-        printDebug("Exporting opened file to: " + exportPath);
+        printDebug("Exporting base design to: " + exportPath);
         exportFile(doc, exportPath, "jpg", false);
         printDebug("Export completed: ngoaithat_nen.jpg");
 
@@ -2055,8 +1977,8 @@ function separateLayers(config) {
         var baseLayerId = doc.layers[0].id;
         printDebug("Original base layer ID: " + baseLayerId + " name: " + doc.layers[0].name);
 
-        // Thêm layer từ file "id.png"
-        var idFile = config.texture4_folder + "\\id.png";
+        // Thêm layer từ file ID (ưu tiên đường dẫn đầy đủ từ config.id_file_path nếu có)
+        var idFile = config.id_file_path ? config.id_file_path : (config.texture4_folder + "\\id.png");
         printDebug("Looking for ID file: " + idFile);
 
         var layer2 = addLayerFromFile(doc, idFile, "id_layer");
@@ -2211,6 +2133,24 @@ function separateLayers(config) {
             doc.activeLayer = layerTachLop;
             printDebug("Layer kept for color overlay: " + layerTachLop.name);
 
+        }
+
+        // Sau khi xuất xong tất cả layer PNG, gọi CorePlugin để convert toàn bộ file PNG trong thư mục layers sang WebP
+        try {
+            var layersFolder = config.texture4_folder + "\\layers";
+            printDebug("Calling CorePlugin to convert PNG files in folder to WebP: " + layersFolder);
+            var webpResult = executeCorePlugin(["-webp", layersFolder]);
+
+            if (webpResult && webpResult.ErrorCode !== undefined && webpResult.ErrorCode !== 0) {
+                var webpError = webpResult.Message || "Không rõ nguyên nhân";
+                printDebug("ERROR: WebP conversion via CorePlugin failed: " + webpError);
+                alert("Lỗi khi convert PNG sang WebP trong thư mục layers:\n" + webpError);
+            } else {
+                printDebug("WebP conversion via CorePlugin completed successfully for folder: " + layersFolder);
+            }
+        } catch (convErr) {
+            printDebug("ERROR while calling CorePlugin for WebP conversion: " + convErr.toString());
+            // Không chặn luồng chính nếu convert thất bại, chỉ log & cảnh báo nhẹ
         }
 
         // Remove ID layer after all processing is complete
@@ -2649,20 +2589,16 @@ function execute_generate_file(config) {
 
     try {
         //get color code
-        // Use the texture4_folder from config as the base folder for color_setting.json
-        var filePath = config.texture4_folder + "\\color_setting.json";
-        var colorFile = new File(filePath);
-        printDebug("Looking for color_setting.json at: " + filePath);
-
-        if (!colorFile.exists) {
-            printDebug("ERROR: color_setting.json not found at: " + filePath);
-            alert("Không tìm thấy file color_setting.json trong thư mục " + config.texture4_folder);
+        // Cấu hình màu đã được chuẩn bị sẵn trong config.color_setting bởi CorePlugin/prepareConfigFromIdFile
+        if (!config.color_setting) {
+            printDebug("ERROR: config.color_setting is missing");
+            alert("Không tìm thấy dữ liệu cấu hình màu (color_setting) trong cấu hình. Vui lòng kiểm tra lại file ID và cấu hình.");
             return false;
         }
 
-        color_setting = readJSONFile(colorFile);
+        color_setting = config.color_setting;
         colors = color_setting.layers;
-        printDebug("Color settings loaded successfully: " + JSON.stringify(color_setting));
+        printDebug("Color settings loaded from config.color_setting: " + JSON.stringify(color_setting));
 
         // Bước 2: Tạo các folder output
         if (!createOutputFolders(config)) {
@@ -2681,6 +2617,7 @@ function execute_generate_file(config) {
         if (doc == null) {
             return false;
         }
+        doc.close(SaveOptions.DONOTSAVECHANGES);
 
         // Plugin hiện tại chỉ chạy đến bước tách lớp
         alert("Đã thực hiện tách lớp xong!");

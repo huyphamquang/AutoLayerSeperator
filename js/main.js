@@ -102,16 +102,6 @@ function generate(try_mode) {
       }
     });
   }
-
-  // Nếu đã có config_info thì chạy luôn
-  if (config_info && config_info !== null) {
-    doGenerate();
-    return;
-  }
-
-  // Chưa có config_info: gọi hostscript để chuẩn bị cấu hình từ file ID đã chọn
-  printDebug("config_info is null, calling prepareConfigFromIdFile in hostscript");
-
   // Escape path for ExtendScript string literal
   var idPathEscaped = selectedIdFilePath.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
   var prepareScript = `prepareConfigFromIdFile("${idPathEscaped}")`;
