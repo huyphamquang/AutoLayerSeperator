@@ -1670,11 +1670,30 @@ function executeCorePlugin(args) {
 }
 
 // Hàm chạy CorePlugin.exe để tìm vị trí các điểm ảnh
-function runCorePlugin(folderPath) {
+function runCorePlugin(inputPath) {
     try {
         printDebug("=== runCorePlugin START ===");
         printDebug("Step 1: Preparing to run CorePlugin.exe...");
-        printDebug("Step 1.1: Folder path: " + folderPath);
+        printDebug("Step 1.1: Input path (file or folder): " + inputPath);
+
+        // Xác định thư mục làm việc (chứa output.json)
+        var folderPath = null;
+        var testFolder = new Folder(inputPath);
+        if (testFolder.exists) {
+            folderPath = testFolder.fsName;
+        } else {
+            var testFile = new File(inputPath);
+            if (testFile.exists) {
+                folderPath = testFile.parent.fsName;
+            }
+        }
+
+        if (!folderPath) {
+            printDebug("ERROR: Invalid inputPath for runCorePlugin: " + inputPath);
+            alert("Đường dẫn truyền vào CorePlugin không hợp lệ: " + inputPath);
+            return false;
+        }
+        printDebug("Resolved working folder for CorePlugin: " + folderPath);
         
         // Delete output.json if it exists
         var outputJsonPath = folderPath + "\\output.json";
@@ -1688,9 +1707,9 @@ function runCorePlugin(folderPath) {
             printDebug("Step 2.1: output.json does not exist - OK");
         }
         
-        // Run CorePlugin.exe using common function
+        // Run CorePlugin.exe using common function, with original input path (file or folder)
         printDebug("Step 3: Running CorePlugin.exe...");
-        var result = executeCorePlugin([folderPath]);
+        var result = executeCorePlugin([inputPath]);
         
         // Check ErrorCode from executeCorePlugin result
         if (result.ErrorCode !== undefined && result.ErrorCode !== 0) {
@@ -1719,6 +1738,168 @@ function runCorePlugin(folderPath) {
         printDebug("Error message: " + (err.message || "N/A"));
         alert("Error running CorePlugin.exe: " + err);
         return false;
+    }
+}
+
+// Helper: select ID.png for UI only (do NOT run CorePlugin here).
+// Returns JSON string with { success: boolean, fileName: string, filePath: string, error: string }
+function selectAndReadConfigFromIdFile() {
+    try {
+        printDebug("=== selectAndReadConfigFromIdFile START ===");
+        
+        var file = File.openDialog("Chọn file ID (dùng để tách lớp màu)", "PNG:*.png");
+        if (file == null) {
+            printDebug("No file selected by user");
+            return JSON.stringify({ success: false, error: "No file selected", fileName: null, config: null });
+        }
+        
+        var idPath = file.fsName;
+        var idFileName = file.name;
+        printDebug("Selected ID file: " + idPath);
+        printDebug("=== selectAndReadConfigFromIdFile COMPLETED ===");
+        return JSON.stringify({ success: true, fileName: idFileName, filePath: idPath, error: null });
+    } catch (err) {
+        printDebug("=== selectAndReadConfigFromIdFile ERROR ===");
+        printDebug("ERROR: " + err.toString());
+        return JSON.stringify({ success: false, error: "Lỗi:\n" + err.toString(), fileName: null, filePath: null });
+    }
+}
+
+// Helper: build config_info from a selected ID file path (no UI interaction here).
+// - Runs CorePlugin.exe with the full ID path (to create output.json & use color_setting.json with fallback logic in Program.cs)
+// - Reads color_setting.json (from ID folder; if missing, falls back to default CorePlugin/color_setting.json like Program.cs)
+// - Returns JSON string with { success: boolean, config: object, error: string }
+function prepareConfigFromIdFile(idPath) {
+    try {
+        printDebug("=== prepareConfigFromIdFile START ===");
+        printDebug("ID file path: " + idPath);
+
+        if (!idPath || idPath === "") {
+            return JSON.stringify({ success: false, error: "Đường dẫn file ID không hợp lệ", config: null });
+        }
+
+        var idFile = new File(idPath);
+        if (!idFile.exists) {
+            printDebug("ID file does not exist: " + idPath);
+            return JSON.stringify({ success: false, error: "File ID không tồn tại: " + idPath, config: null });
+        }
+
+        var folderPath = idFile.parent.fsName;
+        printDebug("ID folder: " + folderPath);
+
+        // Gọi CorePlugin.exe với đường dẫn đầy đủ tới file ID (để tạo output.json, chọn điểm magic wand...)
+        var result = executeCorePlugin([idPath]);
+        if (result.ErrorCode !== undefined && result.ErrorCode !== 0) {
+            var errorMsg = result.Message || "CorePlugin thất bại";
+            printDebug("CorePlugin failed in prepareConfigFromIdFile: " + errorMsg);
+            return JSON.stringify({ success: false, error: errorMsg, config: null });
+        }
+
+        // Xác định file color_setting.json cần dùng (thư mục ID hoặc default CorePlugin)
+        var colorSettingPath = folderPath + "\\color_setting.json";
+        var colorSettingFile = new File(colorSettingPath);
+
+        if (!colorSettingFile.exists) {
+            printDebug("color_setting.json not found in ID folder: " + colorSettingPath);
+
+            // Tìm thư mục plugin giống executeCorePlugin để lấy file mặc định
+            var pluginFolder = null;
+            var pluginName = "AutoLayerSeperatorLicense";
+            var cepBasePaths = [];
+
+            try {
+                var userDataPath = Folder.userData.fsName + "\\Adobe\\CEP\\extensions";
+                cepBasePaths.push(userDataPath);
+            } catch (e) {}
+
+            try {
+                var commonFilesPath = Folder.commonFiles.fsName + "\\Adobe\\CEP\\extensions";
+                cepBasePaths.push(commonFilesPath);
+            } catch (e) {}
+
+            cepBasePaths.push("C:\\Program Files (x86)\\Common Files\\Adobe\\CEP\\extensions");
+            cepBasePaths.push("C:\\Program Files\\Common Files\\Adobe\\CEP\\extensions");
+
+            for (var i = 0; i < cepBasePaths.length && !pluginFolder; i++) {
+                var testPath = cepBasePaths[i] + "\\" + pluginName;
+                var manifestPath = testPath + "\\CSXS\\manifest.xml";
+                var manifestFile = new File(manifestPath);
+                if (manifestFile.exists) {
+                    pluginFolder = new Folder(testPath);
+                }
+            }
+
+            if (!pluginFolder) {
+                var scriptFile = new File($.fileName);
+                var hostFolder = scriptFile.parent;
+                var testFolder = hostFolder.parent;
+                var manifestPath2 = testFolder.fsName + "\\CSXS\\manifest.xml";
+                var manifestFile2 = new File(manifestPath2);
+                if (manifestFile2.exists) {
+                    pluginFolder = testFolder;
+                }
+            }
+
+            if (pluginFolder) {
+                var defaultColorSettingPath = pluginFolder.fsName + "\\dist\\color_setting.json";
+                var defaultColorSettingFile = new File(defaultColorSettingPath);
+                if (!defaultColorSettingFile.exists) {
+                    // thử ở root plugin
+                    defaultColorSettingPath = pluginFolder.fsName + "\\color_setting.json";
+                    defaultColorSettingFile = new File(defaultColorSettingPath);
+                }
+
+                if (defaultColorSettingFile.exists) {
+                    printDebug("Using default color_setting.json from plugin: " + defaultColorSettingPath);
+                    colorSettingFile = defaultColorSettingFile;
+                } else {
+                    var errMsg = "Không tìm thấy color_setting.json trong thư mục ID và cũng không tìm thấy file mặc định trong plugin";
+                    printDebug(errMsg);
+                    return JSON.stringify({ success: false, error: errMsg, config: null });
+                }
+            } else {
+                var errMsg2 = "Không xác định được thư mục plugin để lấy color_setting.json mặc định";
+                printDebug(errMsg2);
+                return JSON.stringify({ success: false, error: errMsg2, config: null });
+            }
+        }
+
+        // Đọc color_setting.json để lấy ds_layer
+        colorSettingFile.encoding = "UTF8";
+        colorSettingFile.open("r");
+        var colorJson = colorSettingFile.read();
+        colorSettingFile.close();
+        var colorData = JSON.parse(colorJson);
+        if (!colorData.layers || !(colorData.layers instanceof Array)) {
+            return JSON.stringify({ success: false, error: "color_setting.json không có mảng layers", config: null });
+        }
+
+        var ds_layer = [];
+        for (var j = 0; j < colorData.layers.length; j++) {
+            var name = colorData.layers[j].name;
+            if (name) ds_layer.push(name);
+        }
+
+        var config = {
+            ds_layer: ds_layer,
+            ds_pa: null,
+            texture1_folder: null,
+            texture2_folder: null,
+            material_folder: null,
+            template_file: null,
+            texture4_folder: folderPath,
+            agency_name: null,
+            create_date: null,
+            ma_cong_trinh: null,
+            id_file_path: idPath
+        };
+
+        printDebug("=== prepareConfigFromIdFile COMPLETED ===");
+        return JSON.stringify({ success: true, config: config, error: null });
+    } catch (err) {
+        printDebug("=== prepareConfigFromIdFile ERROR ===");
+        printDebug("ERROR: " + err.toString());
+        return JSON.stringify({ success: false, error: "Lỗi:\n" + err.toString(), config: null });
     }
 }
 
@@ -1892,10 +2073,10 @@ function separateLayers(config) {
         
         // Bước mới: Chạy CorePlugin.exe để tìm vị trí các điểm ảnh
         printDebug("=== Running CorePlugin.exe to find pixel positions ===");
-        var idFolderPath = config.texture4_folder; // Thư mục chứa id.png
-        printDebug("Step 1: Running CorePlugin.exe with folder: " + idFolderPath);
+        var idInputPath = config.id_file_path ? config.id_file_path : config.texture4_folder; // ưu tiên đường dẫn file ID nếu có
+        printDebug("Step 1: Running CorePlugin.exe with input: " + idInputPath);
         
-        if (!runCorePlugin(idFolderPath)) {
+        if (!runCorePlugin(idInputPath)) {
             printDebug("ERROR: CorePlugin.exe failed");
             doc.close(SaveOptions.DONOTSAVECHANGES);
             return null;
@@ -1903,7 +2084,7 @@ function separateLayers(config) {
         
         // Đọc file output.json
         printDebug("Step 2: Reading output.json...");
-        var outputJsonPath = idFolderPath + "\\output.json";
+        var outputJsonPath = config.texture4_folder + "\\output.json";
         var outputJsonFile = new File(outputJsonPath);
         
         if (!outputJsonFile.exists) {

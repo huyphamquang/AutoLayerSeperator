@@ -1,0 +1,45 @@
+{
+    "fuzziness": 50,
+    "layers": [
+        {
+            "name": "ngoaithat_Phao",
+            "hex": "#b67612"
+        },
+        {
+            "name": "ngoaithat_Chi",
+            "hex": "#759610"
+        },
+        {
+            "name": "ngoaithat_Tuong",
+            "hex": "#dd0d0d"
+        },
+        {
+            "name": "ngoaithat_Cot",
+            "hex": "#057e5b"
+        },
+        {
+            "name": "ngoaithat_ChuA",
+            "hex": "#ac43bd"
+        },
+        {
+            "name": "ngoaithat_Nhan",
+            "hex": "#0c3771"
+        },
+        {
+            "name": "ngoaithat_Conson",
+            "hex": "#901058"
+        },
+        {
+            "name": "ngoaithat_Tomoi",
+            "hex": "#591b26"
+        },
+        {
+            "name": "ngoaithat_Lancan",
+            "hex": "#5d8e51"
+        },
+        {
+            "name": "ngoaithat_Danmua",
+            "hex": "#ffda00"
+        }
+    ]
+}

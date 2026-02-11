@@ -72,83 +72,80 @@ namespace Plugin.Photoshop.AutoLayerSeperator
                     errorMessage = "Missing input parameter.";
                     Console.WriteLine("ERROR: Missing input parameter.");
                     Console.WriteLine("Usage:");
-                    Console.WriteLine("  CorePlugin.exe <folder_path>");
-                    Console.WriteLine("  CorePlugin.exe -c <excel_file_path>");
+                    Console.WriteLine("  CorePlugin.exe <id_file_path_or_folder_path>");
                 }
 
-                // Nếu có từ 2 tham số và tham số đầu là -c, đọc file cấu hình Excel
-                if (args.Length >= 2 && args[0] == "-c")
-                {
-                    string excelFilePath = args[1];
-                    Console.WriteLine($"Reading configuration from Excel file: {excelFilePath}");
-
-                    try
-                    {
-                        ConfigurationReader reader = new ConfigurationReader();
-                        string configJsonPath = reader.ReadConfig(excelFilePath);
-
-                        if (configJsonPath != null)
-                        {
-                            Console.WriteLine();
-                            Console.WriteLine($"Successfully created config.json at: {configJsonPath}");
-                            errorCode = 0;
-                        }
-                        else
-                        {
-                            errorCode = 1;
-                            errorMessage = "Failed to read configuration from Excel file.";
-                            Console.WriteLine();
-                            Console.WriteLine("ERROR: Failed to read configuration from Excel file.");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        errorCode = 500;
-                        errorMessage = ex.ToString();
-                        Console.WriteLine();
-                        Console.WriteLine($"ERROR: Error during configuration reading: {ex.Message}");
-                        Console.WriteLine($"Details: {ex}");
-                    }
-                }
-
-                // Nếu có 1 tham số, thực hiện logic xử lý folder như hiện tại
+                // Nếu có 1 tham số: đường dẫn đầy đủ file ID hoặc thư mục chứa ID.png
                 if (args.Length == 1)
                 {
-                    string inputFolder = args[0];
-                    Console.WriteLine($"Input folder: {inputFolder}");
+                    string inputPath = args[0];
+                    Console.WriteLine($"Input: {inputPath}");
 
-                    // Kiểm tra thư mục có tồn tại không
-                    if (!Directory.Exists(inputFolder))
+                    string idPngPath;
+                    string inputFolder;
+
+                    if (File.Exists(inputPath))
                     {
-                        errorCode = 1;
-                        errorMessage = $"Folder does not exist: {inputFolder}";
-                        Console.WriteLine($"ERROR: Folder does not exist: {inputFolder}");
+                        // Đường dẫn đầy đủ tới file ID
+                        idPngPath = inputPath;
+                        inputFolder = Path.GetDirectoryName(inputPath);
+                        Console.WriteLine($"Using ID file: {idPngPath}");
+                        Console.WriteLine($"Folder: {inputFolder}");
+                    }
+                    else if (Directory.Exists(inputPath))
+                    {
+                        inputFolder = inputPath;
+                        idPngPath = Path.Combine(inputFolder, "ID.png");
+                        Console.WriteLine($"Using folder; ID file: {idPngPath}");
                     }
                     else
                     {
-                        // Kiểm tra các file cần thiết
-                        string idPngPath = Path.Combine(inputFolder, "ID.png");
+                        errorCode = 1;
+                        errorMessage = $"File or folder does not exist: {inputPath}";
+                        Console.WriteLine($"ERROR: {errorMessage}");
+                        inputFolder = null;
+                        idPngPath = null;
+                    }
+
+                    if (idPngPath != null && inputFolder != null)
+                    {
                         string colorSettingPath = Path.Combine(inputFolder, "color_setting.json");
                         string outputPath = Path.Combine(inputFolder, "output.json");
 
                         if (!File.Exists(idPngPath))
                         {
                             errorCode = 1;
-                            errorMessage = $"File ID.png not found in folder: {inputFolder}";
-                            Console.WriteLine($"ERROR: File ID.png not found in folder: {inputFolder}");
-                        }
-                        else if (!File.Exists(colorSettingPath))
-                        {
-                            errorCode = 1;
-                            errorMessage = $"File color_setting.json not found in folder: {inputFolder}";
-                            Console.WriteLine($"ERROR: File color_setting.json not found in folder: {inputFolder}");
+                            errorMessage = $"File ID not found: {idPngPath}";
+                            Console.WriteLine($"ERROR: {errorMessage}");
                         }
                         else
                         {
-                            Console.WriteLine($"Found file ID.png: {idPngPath}");
+                            // Nếu không có color_setting.json trong thư mục chứa ID,
+                            // sử dụng file mặc định đi kèm CorePlugin (CorePlugin/color_setting.json).
+                            if (!File.Exists(colorSettingPath))
+                            {
+                                string exeDirectory = AppDomain.CurrentDomain.BaseDirectory;
+                                string defaultColorSettingPath = Path.Combine(exeDirectory, "color_setting.json");
+
+                                if (File.Exists(defaultColorSettingPath))
+                                {
+                                    Console.WriteLine($"WARNING: color_setting.json not found in folder: {inputFolder}");
+                                    Console.WriteLine($"Using default color_setting.json from: {defaultColorSettingPath}");
+                                    colorSettingPath = defaultColorSettingPath;
+                                }
+                                else
+                                {
+                                    errorCode = 1;
+                                    errorMessage = $"File color_setting.json not found in folder: {inputFolder} and default color_setting.json not found at: {defaultColorSettingPath}";
+                                    Console.WriteLine($"ERROR: {errorMessage}");
+                                    // Không tiếp tục xử lý nếu không có được file cấu hình màu
+                                    goto EndArgumentHandling;
+                                }
+                            }
+
+                            Console.WriteLine($"Found file ID: {idPngPath}");
                             Console.WriteLine($"Found file color_setting.json: {colorSettingPath}");
 
-                            // Xóa file output nếu tồn tại
                             if (File.Exists(outputPath))
                             {
                                 File.Delete(outputPath);
@@ -157,7 +154,6 @@ namespace Plugin.Photoshop.AutoLayerSeperator
 
                             try
                             {
-                                // Thực hiện tìm kiếm điểm ảnh
                                 Console.WriteLine();
                                 Console.WriteLine("Starting processing...");
                                 PixelSearcher searcher = new PixelSearcher();
@@ -179,15 +175,16 @@ namespace Plugin.Photoshop.AutoLayerSeperator
                     }
                 }
 
-                // Trường hợp không hợp lệ
-                if (args.Length > 0 && args.Length != 1 && !(args.Length >= 2 && args[0] == "-c"))
+            EndArgumentHandling:
+
+                // Trường hợp không hợp lệ (khác 1 tham số)
+                if (args.Length > 0 && args.Length != 1)
                 {
                     errorCode = 1;
                     errorMessage = "Invalid parameters.";
                     Console.WriteLine("ERROR: Invalid parameters.");
                     Console.WriteLine("Usage:");
-                    Console.WriteLine("  CorePlugin.exe <folder_path>");
-                    Console.WriteLine("  CorePlugin.exe -c <excel_file_path>");
+                    Console.WriteLine("  CorePlugin.exe <id_file_path_or_folder_path>");
                 }
             }
             catch (Exception ex)

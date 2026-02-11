@@ -1,5 +1,6 @@
 // Add this to the top of your main.js file
 var config_info = null;
+var selectedIdFilePath = null; // full path to selected ID file, used when separating layers
 const csLib = new CSInterface();
 var hostEnv = csLib.getHostEnvironment();
 
@@ -77,51 +78,92 @@ function generate(try_mode) {
   printDebug(`config_info type: ${typeof config_info}`);
   printDebug(`config_info === null: ${config_info === null}`);
   
-  // var prs ={file_name:"C:\\Users\\huypq\\OneDrive\\Desktop\\Thuvien_anh\\Vatlieu\\cong_trinh.png", layer_name:"Test"};
-  // var script = `addLayerFromFileWithObject(${JSON.stringify(prs)})`;
-  // console.log(script);
-  // csLib.evalScript(script, (rs)=>{
-  //   console.log(rs);
-  // });
-  
-  if (config_info == null){
-    printDebug("config_info is null, showing alert");
-    alert("Chọn file cấu hình trước khi thực hiện");
+  if (!selectedIdFilePath || isEmpty(selectedIdFilePath)) {
+    printDebug("No ID file selected, showing alert");
+    alert("Chọn file ID (tách lớp màu) trước khi thực hiện");
     return;
   }
 
-  printDebug("config_info is valid, proceeding with generation (separate layers only)");
-  
-  var script = `execute_generate_file(${JSON.stringify(config_info)})`;
-  printDebug(`Executing script: ${script}`);
-  console.log("Executing script:", script);
-  showToast("Đang thực hiện tách lớp...");
-  
-  csLib.evalScript(script, (rs)=>{
-    printDebug(`Script execution result: ${rs}`);
-    console.log("Script result:", rs);
-    if (rs === "true" || rs === true) {
-      showToast("Thực hiện thành công!");
-    } else {
-      showToast("Có lỗi xảy ra trong quá trình thực hiện");
+  // Helper to actually call execute_generate_file once config_info is ready
+  function doGenerate() {
+    printDebug("config_info is ready, proceeding with generation (separate layers only)");
+    var script = `execute_generate_file(${JSON.stringify(config_info)})`;
+    printDebug(`Executing script: ${script}`);
+    console.log("Executing script:", script);
+    showToast("Đang thực hiện tách lớp...");
+    
+    csLib.evalScript(script, (rs)=>{
+      printDebug(`Script execution result: ${rs}`);
+      console.log("Script result:", rs);
+      if (rs === "true" || rs === true) {
+        showToast("Thực hiện thành công!");
+      } else {
+        showToast("Có lỗi xảy ra trong quá trình thực hiện");
+      }
+    });
+  }
+
+  // Nếu đã có config_info thì chạy luôn
+  if (config_info && config_info !== null) {
+    doGenerate();
+    return;
+  }
+
+  // Chưa có config_info: gọi hostscript để chuẩn bị cấu hình từ file ID đã chọn
+  printDebug("config_info is null, calling prepareConfigFromIdFile in hostscript");
+
+  // Escape path for ExtendScript string literal
+  var idPathEscaped = selectedIdFilePath.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+  var prepareScript = `prepareConfigFromIdFile("${idPathEscaped}")`;
+
+  csLib.evalScript(prepareScript, (result) => {
+    try {
+      printDebug(`prepareConfigFromIdFile result: ${result}`);
+      if (!result || result === "") {
+        showToast("Lỗi: Không nhận được kết quả từ hostscript khi chuẩn bị cấu hình");
+        return;
+      }
+      var response = JSON.parse(result);
+      printDebug(`Parsed prepareConfigFromIdFile response: ${JSON.stringify(response)}`);
+
+      if (!response.success) {
+        var errorMsg = response.error || "Không thể tạo cấu hình từ file ID";
+        showToast("Lỗi: " + errorMsg);
+        return;
+      }
+
+      config_info = response.config;
+      printDebug(`config_info created from prepareConfigFromIdFile: ${JSON.stringify(config_info)}`);
+
+      if (!config_info) {
+        showToast("Lỗi: Cấu hình nhận được từ hostscript không hợp lệ");
+        return;
+      }
+
+      // Sau khi chuẩn bị cấu hình thành công, tiến hành tách lớp
+      doGenerate();
+    } catch (err) {
+      printDebug(`ERROR: Failed to process prepareConfigFromIdFile result: ${err.message}`);
+      showToast("Lỗi khi xử lý cấu hình từ file ID: " + err.message);
+      console.log("Error:", err);
     }
   });
 }
 
-// Function to update button states based on config_info
+// Function to update button states based on selected ID file
 function updateButtonStates() {
-  var hasConfig = config_info !== null && config_info !== undefined;
+  var hasIdFile = selectedIdFilePath !== null && selectedIdFilePath !== undefined && !isEmpty(selectedIdFilePath);
   var btnTry = document.getElementById("btnTry");
   var btnPopulate = document.getElementById("btnPopulate");
   
   if (btnTry) {
-    btnTry.disabled = !hasConfig;
+    btnTry.disabled = !hasIdFile;
   }
   if (btnPopulate) {
-    btnPopulate.disabled = !hasConfig;
+    btnPopulate.disabled = !hasIdFile;
   }
   
-  printDebug(`Button states updated - hasConfig: ${hasConfig}`);
+  printDebug(`Button states updated - hasIdFile: ${hasIdFile}`);
 }
 
 window.onload = function()
@@ -129,20 +171,20 @@ window.onload = function()
   // Disable buttons initially
   updateButtonStates();
   
-  // Button to select and read Excel configuration file
+  // Button to select ID.png (file for color layer separation) - only select & show on UI, no CorePlugin call here
   document.getElementById("btnSelectExcel").addEventListener("click", function(){
-    printDebug("btnSelectExcel clicked");
+    printDebug("btnSelectExcel clicked - select ID.png (UI only, no CorePlugin)");
     
-    // Call selectAndReadConfigFile in hostscript.js to select and read Excel file
-    var script = "selectAndReadConfigFile()";
+    var script = "selectAndReadConfigFromIdFile()";
     
-    printDebug("Calling selectAndReadConfigFile via evalScript...");
+    printDebug("Calling selectAndReadConfigFromIdFile via evalScript...");
     csLib.evalScript(script, (result) => {
       try {
-        printDebug(`selectAndReadConfigFile result: ${result}`);
+        printDebug(`selectAndReadConfigFromIdFile result: ${result}`);
         
         if (!result || result === "") {
           showToast("Lỗi: Không nhận được kết quả từ hostscript");
+          selectedIdFilePath = null;
           config_info = null;
           document.getElementById("txtExcel").value = "";
           updateButtonStates();
@@ -153,12 +195,12 @@ window.onload = function()
         printDebug(`Parsed response: ${JSON.stringify(response)}`);
         
         if (!response.success) {
-          printDebug(`ERROR: ${response.error}`);
-          // Don't show error if user cancelled file selection
+          printDebug(`ERROR from selectAndReadConfigFromIdFile: ${response.error}`);
           if (response.error !== "No file selected") {
-            var errorMsg = response.error || "Không thể đọc file cấu hình";
-            showToast("Lỗi đọc file cấu hình:\n" + errorMsg);
+            var errorMsg = response.error || "Không thể chọn file ID";
+            showToast("Lỗi chọn file ID: " + errorMsg);
           }
+          selectedIdFilePath = null;
           config_info = null;
           document.getElementById("txtExcel").value = "";
           updateButtonStates();
@@ -168,43 +210,34 @@ window.onload = function()
         // Set file name to textbox (decode URL encoding if present)
         if (response.fileName) {
           var displayFileName = response.fileName;
-          // Decode URL encoding (e.g., %20 -> space)
           try {
             if (displayFileName.indexOf("%") !== -1) {
               displayFileName = decodeURIComponent(displayFileName);
             }
           } catch (e) {
-            // If decode fails, use original name
             printDebug("Warning: Could not decode file name: " + e.message);
           }
           document.getElementById("txtExcel").value = displayFileName;
           printDebug(`File name set to textbox: ${displayFileName}`);
         }
         
-        // Set configuration data
-        config_info = response.config;
-        printDebug(`selectAndReadConfigFile returned: ${JSON.stringify(config_info)}`);
-        
-        if (config_info === null || config_info === undefined) {
-          showToast("Lỗi: Không thể đọc file cấu hình");
-          document.getElementById("txtExcel").value = "";
-          updateButtonStates();
-          return;
-        }
-        
-        // Show success message - use alert to ensure user sees it
+        // Save full path to selected ID file; reset cached config so it will be rebuilt on next generate()
+        selectedIdFilePath = response.filePath || null;
+        config_info = null;
+        printDebug(`selectedIdFilePath set to: ${selectedIdFilePath}`);
+
+        // Optional: notify user
         var fileName = response.fileName || "N/A";
-        var successMsg = "File cấu hình đã được đọc thành công!";
+        var successMsg = "Đã chọn file ID: " + fileName;
         alert(successMsg);
-        // Removed showToast() since alert() is already shown above
-        console.log("Config loaded:", config_info);
-        
-        // Update button states
+
+        // Update button states (enable tách lớp)
         updateButtonStates();
       } catch (error) {
         printDebug(`ERROR: Failed to process result: ${error.message}`);
         showToast("Lỗi khi xử lý kết quả: " + error.message);
         console.log("Error:", error);
+        selectedIdFilePath = null;
         config_info = null;
         document.getElementById("txtExcel").value = "";
         updateButtonStates();
