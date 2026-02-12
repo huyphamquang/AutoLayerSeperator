@@ -1933,21 +1933,33 @@ function separateLayers(config) {
     try {
         printDebug("=== SEPARATE LAYERS START ===");
 
-        // Mở file thiết kế gốc "goc.jpg" (cùng thư mục với file ID) và dùng làm tài liệu nền để tách lớp
-        var baseFile = new File(config.texture4_folder + "\\goc.jpg");
-        printDebug("Looking for base design file (goc.jpg): " + baseFile.fsName);
+        // Mở file thiết kế gốc (file trắng) trong thư mục texture4_folder.
+        // Tên file: "trang" với thứ tự ưu tiên đuôi: tiff, png, jpg.
+        var baseFile = null;
+        var baseExtensions = ["tiff", "tif", "png", "jpg"];
 
-        if (!baseFile.exists) {
-            printDebug("ERROR: Base design file does not exist: " + baseFile.fsName);
-            alert("Không tìm thấy file 'goc.jpg' trong thư mục " + config.texture4_folder);
+        for (var i = 0; i < baseExtensions.length; i++) {
+            var ext = baseExtensions[i];
+            var candidate = new File(config.texture4_folder + "\\trang." + ext);
+            printDebug("Checking base design file candidate: " + candidate.fsName);
+            if (candidate.exists) {
+                baseFile = candidate;
+                printDebug("Found base design file: " + baseFile.fsName);
+                break;
+            }
+        }
+
+        if (baseFile == null) {
+            printDebug("ERROR: No base design file found with name 'trang' and extensions tiff/tif/png/jpg in folder: " + config.texture4_folder);
+            alert("Không tìm thấy file trắng 'trang.tiff', 'trang.png' hoặc 'trang.jpg' trong thư mục " + config.texture4_folder);
             return null;
         }
 
-        printDebug("Base design file exists, opening...");
+        printDebug("Base design file exists, opening: " + baseFile.fsName);
         var doc = open(baseFile);
         if (doc == null) {
-            printDebug("ERROR: Failed to open base design file (goc.jpg)");
-            alert("Không thể mở file 'goc.jpg'");
+            printDebug("ERROR: Failed to open base design file (file trắng)");
+            alert("Không thể mở file trắng (trang.tiff/png/jpg)");
             return null;
         }
 
