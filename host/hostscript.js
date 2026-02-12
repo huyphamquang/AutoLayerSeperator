@@ -418,7 +418,7 @@ function readJSONFile(jsonFile) {
 
 
 // Debug mode control
-var DEBUG_MODE = false; // Set to false to disable debug logging
+var DEBUG_MODE = true; // Set to false to disable debug logging
 
 // Debug function for Photoshop environment using CSXSEvent
 function printDebug(message) {
@@ -1528,19 +1528,6 @@ function executeCorePlugin(args) {
         
         // Determine working directory from first argument if it's a folder
         var workingDir = Folder.temp.fsName; // Default to temp
-        if (args.length > 0) {
-            var firstArg = args[0];
-            var testFolder = new Folder(firstArg);
-            if (testFolder.exists) {
-                workingDir = firstArg;
-            } else {
-                var testFile = new File(firstArg);
-                if (testFile.exists) {
-                    workingDir = testFile.parent.fsName;
-                }
-            }
-        }
-        
         printDebug("Step 1.3: Working directory: " + workingDir);
         printDebug("Step 1.4: CorePlugin path: " + corePluginPath);
         printDebug("Step 1.5: Arguments: " + JSON.stringify(args));
@@ -1968,9 +1955,9 @@ function separateLayers(config) {
         printDebug("Document has " + doc.layers.length + " layers");
 
         // Export bản nền ban đầu ra ngoaithat_nen.jpg trong thư mục layers để tham chiếu
-        var exportPath = config.texture4_folder + "\\layers\\ngoaithat_nen.jpg";
+        var exportPath = config.texture4_folder + "\\layers\\ngoaithat_nen.png";
         printDebug("Exporting base design to: " + exportPath);
-        exportFile(doc, exportPath, "jpg", false);
+        exportFile(doc, exportPath, "png", false);
         printDebug("Export completed: ngoaithat_nen.jpg");
 
         // Store the original base layer ID before adding new layers
@@ -1993,41 +1980,7 @@ function separateLayers(config) {
         var idLayerId = layer2.id;
         printDebug("ID layer added successfully: " + layer2.name + " ID: " + idLayerId);
         
-        // Bước mới: Chạy CorePlugin.exe để tìm vị trí các điểm ảnh
-        printDebug("=== Running CorePlugin.exe to find pixel positions ===");
-        var idInputPath = config.id_file_path ? config.id_file_path : config.texture4_folder; // ưu tiên đường dẫn file ID nếu có
-        printDebug("Step 1: Running CorePlugin.exe with input: " + idInputPath);
-        
-        if (!runCorePlugin(idInputPath)) {
-            printDebug("ERROR: CorePlugin.exe failed");
-            doc.close(SaveOptions.DONOTSAVECHANGES);
-            return null;
-        }
-        
-        // Đọc file output.json
-        printDebug("Step 2: Reading output.json...");
-        var outputJsonPath = config.texture4_folder + "\\output.json";
-        var outputJsonFile = new File(outputJsonPath);
-        
-        if (!outputJsonFile.exists) {
-            printDebug("ERROR: output.json does not exist");
-            alert("Không tìm thấy file output.json sau khi chạy CorePlugin.exe");
-            doc.close(SaveOptions.DONOTSAVECHANGES);
-            return null;
-        }
-        
-        // Đọc và parse JSON
-        printDebug("Step 2.1: Reading JSON content...");
-        // Set UTF-8 encoding for Unicode support (Vietnamese characters)
-        outputJsonFile.encoding = "UTF8";
-        outputJsonFile.open("r");
-        var jsonContent = outputJsonFile.read();
-        outputJsonFile.close();
-        printDebug("Step 2.1: JSON content read successfully");
-        
-        printDebug("Step 2.2: Parsing JSON...");
-        var pixelData = JSON.parse(jsonContent);
-        printDebug("Step 2.2: JSON parsed successfully");
+        var pixelData = config;
         
         // Kiểm tra pixels có phải là array không (ExtendScript không hỗ trợ Array.isArray)
         // Sử dụng instanceof Array thay vì Array.isArray()
@@ -2055,22 +2008,6 @@ function separateLayers(config) {
             printDebug("--- Processing layer " + (i + 1) + " of " + colorLayers.length + " ---");
             printDebug("Layer name: " + colorLayer.name + " Color: " + colorLayer.hex);
 
-            // Kiểm tra cấu hình phương án màu
-            printDebug("Finding layer index in config for: " + colorLayer.name);
-            var layerIndex = findLayerIndexInConfig(config, colorLayer.name);
-            printDebug("Layer index found: " + layerIndex);
-
-            if (layerIndex == -1) {
-                printDebug("Không tìm thấy layer " + colorLayer.name + " trong file cấu hình");
-                continue;
-            }
-
-            printDebug("Validating color plan for layer index: " + layerIndex);
-            if (!validateColorPlan(config, layerIndex)) {
-                printDebug("Thiếu phương án màu cho layer " + colorLayer.name);
-                continue;
-            }
-            printDebug("Color plan validation passed");
 
             // Tìm pixel data cho layer này
             printDebug("Step 3: Looking for pixel data for layer: " + colorLayer.name);
@@ -2119,19 +2056,20 @@ function separateLayers(config) {
             var layerTachLopId = layerTachLop.id;
             printDebug("Layer created successfully: " + layerTachLop.name + " ID: " + layerTachLopId);
 
-            // Ẩn tất cả layer ngoài layer vừa tạo
+            // Ẩn tất cả layer ngoài layer vừa tạo để chỉ export vùng tách lớp từ baseLayerId
             printDebug("Hiding all layers except: " + layerTachLop.name);
+            layerTachLop = findLayerByName(doc, colorLayer.name);
             hideAllLayersExcept(doc, layerTachLopId);
-            setColorOverlayMultiply(0, 0, 255, "normal");
+            layerTachLop = findLayerByName(doc, colorLayer.name);
 
-            // Export ra file png
+            // Export layer mới (được copy từ baseLayerId theo vùng chọn) ra file PNG
             var outputPath = config.texture4_folder + "\\layers\\" + colorLayer.name + ".png";
             exportFile(doc, outputPath, "png", false);
             printDebug("Export completed for: " + colorLayer.name);
-            
-            // Giữ lại layer tách lớp (giữ blendMode mặc định)
-            doc.activeLayer = layerTachLop;
-            printDebug("Layer kept for color overlay: " + layerTachLop.name);
+
+            // Sau khi export thì xóa layer vừa tạo để không làm thay đổi file gốc
+            printDebug("Removing separated layer after export: " + layerTachLop.name);
+            layerTachLop.remove();
 
         }
 
@@ -2151,17 +2089,6 @@ function separateLayers(config) {
         } catch (convErr) {
             printDebug("ERROR while calling CorePlugin for WebP conversion: " + convErr.toString());
             // Không chặn luồng chính nếu convert thất bại, chỉ log & cảnh báo nhẹ
-        }
-
-        // Remove ID layer after all processing is complete
-        printDebug("Removing ID layer after layer separation completion");
-        var idLayerToDelete = findLayerById(doc, idLayerId);
-        if (idLayerToDelete != null) {
-            printDebug("Removing ID layer: " + idLayerToDelete.name + " ID: " + idLayerId);
-            idLayerToDelete.remove();
-            printDebug("ID layer removed successfully");
-        } else {
-            printDebug("WARNING: Could not find ID layer to delete with ID: " + idLayerId);
         }
 
         return doc;

@@ -90,7 +90,6 @@ function generate(try_mode) {
     var script = `execute_generate_file(${JSON.stringify(config_info)})`;
     printDebug(`Executing script: ${script}`);
     console.log("Executing script:", script);
-    showToast("Đang thực hiện tách lớp...");
     
     csLib.evalScript(script, (rs)=>{
       printDebug(`Script execution result: ${rs}`);
@@ -102,6 +101,9 @@ function generate(try_mode) {
       }
     });
   }
+
+  showToast("Đang thực hiện tách lớp...");
+
   // Escape path for ExtendScript string literal
   var idPathEscaped = selectedIdFilePath.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
   var prepareScript = `prepareConfigFromIdFile("${idPathEscaped}")`;
@@ -140,30 +142,11 @@ function generate(try_mode) {
   });
 }
 
-// Function to update button states based on selected ID file
-function updateButtonStates() {
-  var hasIdFile = selectedIdFilePath !== null && selectedIdFilePath !== undefined && !isEmpty(selectedIdFilePath);
-  var btnTry = document.getElementById("btnTry");
-  var btnPopulate = document.getElementById("btnPopulate");
-  
-  if (btnTry) {
-    btnTry.disabled = !hasIdFile;
-  }
-  if (btnPopulate) {
-    btnPopulate.disabled = !hasIdFile;
-  }
-  
-  printDebug(`Button states updated - hasIdFile: ${hasIdFile}`);
-}
-
 window.onload = function()
 {
-  // Disable buttons initially
-  updateButtonStates();
-  
-  // Button to select ID.png (file for color layer separation) - only select & show on UI, no CorePlugin call here
-  document.getElementById("btnSelectExcel").addEventListener("click", function(){
-    printDebug("btnSelectExcel clicked - select ID.png (UI only, no CorePlugin)");
+  // Chọn file ID (id.png) -> mở hộp thoại chọn file, sau đó chạy plugin (tách lớp) như btnPopulate
+  document.getElementById("btnSelectFile").addEventListener("click", function(){
+    printDebug("btnSelectFile clicked - open file dialog then run plugin");
     
     var script = "selectAndReadConfigFromIdFile()";
     
@@ -176,8 +159,6 @@ window.onload = function()
           showToast("Lỗi: Không nhận được kết quả từ hostscript");
           selectedIdFilePath = null;
           config_info = null;
-          document.getElementById("txtExcel").value = "";
-          updateButtonStates();
           return;
         }
         
@@ -192,51 +173,28 @@ window.onload = function()
           }
           selectedIdFilePath = null;
           config_info = null;
-          document.getElementById("txtExcel").value = "";
-          updateButtonStates();
           return;
         }
         
-        // Set file name to textbox (decode URL encoding if present)
-        if (response.fileName) {
-          var displayFileName = response.fileName;
-          try {
-            if (displayFileName.indexOf("%") !== -1) {
-              displayFileName = decodeURIComponent(displayFileName);
-            }
-          } catch (e) {
-            printDebug("Warning: Could not decode file name: " + e.message);
-          }
-          document.getElementById("txtExcel").value = displayFileName;
-          printDebug(`File name set to textbox: ${displayFileName}`);
-        }
-        
-        // Save full path to selected ID file; reset cached config so it will be rebuilt on next generate()
+        // Save full path to selected ID file; reset cached config so it will be rebuilt in generate()
         selectedIdFilePath = response.filePath || null;
         config_info = null;
         printDebug(`selectedIdFilePath set to: ${selectedIdFilePath}`);
-
-        // Optional: notify user
-        var fileName = response.fileName || "N/A";
-        var successMsg = "Đã chọn file ID: " + fileName;
-        alert(successMsg);
-
-        // Update button states (enable tách lớp)
-        updateButtonStates();
+        generate(false);
       } catch (error) {
         printDebug(`ERROR: Failed to process result: ${error.message}`);
         showToast("Lỗi khi xử lý kết quả: " + error.message);
         console.log("Error:", error);
         selectedIdFilePath = null;
         config_info = null;
-        document.getElementById("txtExcel").value = "";
-        updateButtonStates();
       }
     });
   });
   
-  document.getElementById("btnPopulate").addEventListener("click", ()=>generate(false));
-  document.getElementById("btnTry").addEventListener("click", ()=>generate(true));
+  var btnTry = document.getElementById("btnTry");
+  if (btnTry) {
+    btnTry.addEventListener("click", ()=>generate(true));
+  }
 }
 
 // Debug function to check config_info state

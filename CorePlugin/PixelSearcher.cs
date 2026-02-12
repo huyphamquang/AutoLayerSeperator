@@ -37,6 +37,15 @@ namespace Plugin.Photoshop.AutoLayerSeperator
 
         public class ColorSetting
         {
+            /// <summary>
+            /// Độ fuzziness (tolerance) dùng cho Magic Wand, được copy nguyên từ color_setting.json
+            /// </summary>
+            [JsonProperty("fuzziness")]
+            public int Fuzziness { get; set; }
+
+            /// <summary>
+            /// Danh sách layer cấu hình màu, được copy nguyên từ color_setting.json
+            /// </summary>
             [JsonProperty("layers")]
             public List<LayerConfig> Layers { get; set; }
         }
@@ -61,6 +70,12 @@ namespace Plugin.Photoshop.AutoLayerSeperator
             /// </summary>
             [JsonProperty("pixels")]
             public List<PixelResult> Pixels { get; set; }
+
+            /// <summary>
+            /// Toàn bộ cấu hình màu được đọc từ file color_setting.json
+            /// </summary>
+            [JsonProperty("color_setting")]
+            public ColorSetting ColorSetting { get; set; }
         }
 
         public void SearchPixels(string imagePath, string configPath, string outputPath)
@@ -99,7 +114,7 @@ namespace Plugin.Photoshop.AutoLayerSeperator
             // { ds_layer: [], texture4_folder: "", pixels: [] }
             Console.WriteLine();
             Console.WriteLine($"Found {results.Count} pixels.");
-            WriteOutputJson(outputPath, results, dsLayer, texture4Folder);
+            WriteOutputJson(outputPath, results, dsLayer, texture4Folder, colorSetting);
         }
 
         private ColorSetting ReadColorSetting(string configPath)
@@ -226,13 +241,19 @@ namespace Plugin.Photoshop.AutoLayerSeperator
             return deltaR <= tolerance && deltaG <= tolerance && deltaB <= tolerance;
         }
 
-        private void WriteOutputJson(string outputPath, List<PixelResult> results, List<string> dsLayer, string texture4Folder)
+        private void WriteOutputJson(
+            string outputPath,
+            List<PixelResult> results,
+            List<string> dsLayer,
+            string texture4Folder,
+            ColorSetting colorSetting)
         {
             var outputData = new OutputData
             {
                 DsLayer = dsLayer ?? new List<string>(),
                 Texture4Folder = texture4Folder ?? string.Empty,
-                Pixels = results ?? new List<PixelResult>()
+                Pixels = results ?? new List<PixelResult>(),
+                ColorSetting = colorSetting
             };
 
             string json = JsonConvert.SerializeObject(outputData, Formatting.Indented);

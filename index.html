@@ -25,25 +25,17 @@
 
 <body>
   <div class="container-fluid">
-
-    <label class="control-label m-1" for="txtExcel">File ID (tách lớp màu):</label>
-    <div class="m-1">
-      <input type="text" class="form-control form-control-sm" id="txtExcel" readonly placeholder="Chưa chọn file ID.png">
-    </div>
+    <br/>
     <div class="m-1">
       <small class="form-text text-muted">
-        File thiết ké gốc (goc.jpg) bắt buộc phải có trong thư mục với file được chọn.
+        Chọn file tách lớp (id.png) để thực hiện. File thiết kế gốc (goc.jpg) phải có trong thư mục chứa file được chọn.
       </small>
     </div>
-
   </div>
   <div class="m-3">
-    <button class="btn btn-sm btn-primary btn-block" id="btnSelectExcel" type="button">Chọn file</button>
-  </div>
-
-  <div class="m-3">
-    <button class="btn btn-sm btn-warning btn-block" id="btnPopulate" type="button" disabled>Tách lớp</button>
-    <span class="badge badge-info">Version 1.0.0</span>
+    <button class="btn btn-sm btn-primary btn-block" id="btnSelectFile" type="button">Chọn file và tách lớp</button>
+    <br/>
+    <div class="text-right mt-1"><span class="badge badge-info">Version 1.0.1</span></div>
   </div>
   
   <!-- Toast box moved outside container for proper floating -->
@@ -55,6 +47,6 @@
 <script src="js/popper.min.js"></script>
 <script src="js/bootstrap.min.js"></script>
 <script src="js/CSInterface.js"></script>
-<script src="js/main.js?v15"></script>
+<script src="js/main.js?v2"></script>
 
 </html>
