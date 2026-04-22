@@ -418,7 +418,7 @@ function readJSONFile(jsonFile) {
 
 
 // Debug mode control
-var DEBUG_MODE = true; // Set to false to disable debug logging
+var DEBUG_MODE = false; // Set to false to disable debug logging
 
 // Debug function for Photoshop environment using CSXSEvent
 function printDebug(message) {
@@ -1510,7 +1510,7 @@ function executeCorePlugin(args) {
             };
         }
         
-        var corePluginPath = pluginFolder.fsName + "\\CorePlugin.exe";
+        var corePluginPath = pluginFolder.fsName + "\\dist\\CorePlugin.exe";
         var corePluginFile = new File(corePluginPath);
         
         printDebug("Step 1.2.8: Plugin directory: " + pluginFolder.fsName);
@@ -1527,19 +1527,6 @@ function executeCorePlugin(args) {
         
         // Determine working directory from first argument if it's a folder
         var workingDir = Folder.temp.fsName; // Default to temp
-        if (args.length > 0) {
-            var firstArg = args[0];
-            var testFolder = new Folder(firstArg);
-            if (testFolder.exists) {
-                workingDir = firstArg;
-            } else {
-                var testFile = new File(firstArg);
-                if (testFile.exists) {
-                    workingDir = testFile.parent.fsName;
-                }
-            }
-        }
-        
         printDebug("Step 1.3: Working directory: " + workingDir);
         printDebug("Step 1.4: CorePlugin path: " + corePluginPath);
         printDebug("Step 1.5: Arguments: " + JSON.stringify(args));
@@ -1853,10 +1840,10 @@ function separateLayers(config) {
         printDebug("Document has " + doc.layers.length + " layers");
 
         // Export the opened file to ngoaithat_nen.jpg
-        var exportPath = config.texture4_folder + "\\layers\\ngoaithat_nen.jpg";
+        var exportPath = config.texture4_folder + "\\layers\\ngoaithat_nen.png";
         printDebug("Exporting opened file to: " + exportPath);
-        exportFile(doc, exportPath, "jpg", false);
-        printDebug("Export completed: ngoaithat_nen.jpg");
+        exportFile(doc, exportPath, "png", false);
+        printDebug("Export completed: ngoaithat_nen.png");
 
         // Store the original base layer ID before adding new layers
         var baseLayerId = doc.layers[0].id;
